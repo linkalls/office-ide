@@ -37,7 +37,7 @@ history / undo / redo
 | 仕様書 | 状態 | 現在の実装 | 残作業 |
 | --- | --- | --- | --- |
 | Phase 0 — Foundation | 🟡 | Bun monorepo、React/Vite shell、Tauri 2/Rustの雛形、Explorer、tabs、command palette、resource-neutralなeditor shell | 実workspace作成/読込/保存、Tauri commandの実接続、Rust toolchain上でのdesktop起動確認 |
-| Phase 1 — Spreadsheet Core | 🟡 | Spreadsheet IR、KDL MVP parser/serializer、Grid/Source双方向更新、cell value/formula編集、基本transaction、Undo/Redo | Univer Sheets、数式計算、style/row/column操作、AST-preserving patch、永続化、完全なKDL 2.0 |
+| Phase 1 — Spreadsheet Core | 🟡 | Spreadsheet IR、KDL MVP parser/serializer、Grid/Source双方向更新、cell value/formula編集、cell styleの最小semantic operationとKDL round-trip、基本transaction、Undo/Redo | Univer Sheets、完全な数式計算、named style/row/column操作、AST-preserving patch、永続化、完全なKDL 2.0 |
 | Phase 2 — Agent Infrastructure | 🟡 | Agent pane、Claude/Codex/Cursor/Shell tabs、context表示、History/Diff/Problems/TerminalのUI surface | xterm.js、portable-pty、CLI launcher、sheetctl、local IPC、Skills、agent transaction、semantic diff実処理 |
 | Phase 3 — XLSX | ⬜ | なし | importer/exporter、compatibility report、opaque OOXML preservation |
 | Phase 4 — Document Core | ⬜ | Explorer上のdocument見本のみ | Univer Docs、Document IR、Djot、layout KDL、双方向同期、docctl、Document Skill |
@@ -48,7 +48,7 @@ history / undo / redo
 
 | 分野 | できること | まだできないこと |
 | --- | --- | --- |
-| Spreadsheet | sample KDLの表示、セル値/式文字列の編集、Sourceとの双方向反映、Undo/Redo | Univer描画、式評価、style、行列操作、複数sheet操作、ファイルsave/load |
+| Spreadsheet | sample KDLの表示、セル値/式文字列の編集、bold/italic/color/alignmentの最小style編集、Sourceとの双方向反映、Undo/Redo | Univer描画、完全な式評価、named style、行列操作、複数sheet操作、ファイルsave/load |
 | Document | IDE shell内のresource表現 | Djot/Visual editor、Document IR、同期、履歴、保存 |
 | Agent | pane、tab、context barのUI | Agent process起動、PTY、prompt送信、sheetctl/docctl、Skill実行 |
 | IDE | Explorer、editor tabs、command palette、Source/Diff/History/Problems/Terminal view、responsive layout | quick open、global search、実terminal、実Git、autosave/recovery、Light/System theme |
@@ -177,4 +177,3 @@ bun run tauri dev
 - 既存の双方向vertical sliceを壊さない。
 - Bun scriptsを使い、完了時にtypecheck、tests、buildを実行する。
 - 実装範囲と未達をこのファイルへ追記し、コミット単位で現在地を更新する。
-

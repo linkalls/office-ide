@@ -2,6 +2,7 @@ import { findKdlChildren, parseKdl } from "@office-ide/kdl";
 import type { Diagnostic } from "@office-ide/protocol";
 import {
   createEmptyWorkbook,
+  type CellStyle,
   type CellScalar,
   type SpreadsheetWorkbook,
 } from "@office-ide/spreadsheet-ir";
@@ -9,6 +10,27 @@ import {
 export interface SheetSourceParseResult {
   workbook: SpreadsheetWorkbook | null;
   diagnostics: Diagnostic[];
+}
+
+function parseCellStyle(cellNode: ReturnType<typeof findKdlChildren>[number]): CellStyle | undefined {
+  const font = findKdlChildren(cellNode, "font")[0];
+  const fill = findKdlChildren(cellNode, "fill")[0];
+  const align = findKdlChildren(cellNode, "align")[0];
+  const numberFormat = findKdlChildren(cellNode, "number-format")[0];
+  const style: CellStyle = {
+    bold: typeof font?.properties.bold === "boolean" ? font.properties.bold : undefined,
+    italic: typeof font?.properties.italic === "boolean" ? font.properties.italic : undefined,
+    foreground: typeof font?.properties.color === "string" ? font.properties.color : undefined,
+    background: typeof fill?.arguments[0] === "string" ? fill.arguments[0] : undefined,
+    horizontalAlign:
+      align?.properties.horizontal === "left" ||
+      align?.properties.horizontal === "center" ||
+      align?.properties.horizontal === "right"
+        ? align.properties.horizontal
+        : undefined,
+    numberFormat: typeof numberFormat?.arguments[0] === "string" ? numberFormat.arguments[0] : undefined,
+  };
+  return Object.values(style).some((value) => value !== undefined) ? style : undefined;
 }
 
 export function parseSpreadsheetSource(source: string): SheetSourceParseResult {
@@ -68,6 +90,7 @@ export function parseSpreadsheetSource(source: string): SheetSourceParseResult {
         address,
         value,
         formula: typeof formula === "string" ? formula : undefined,
+        style: parseCellStyle(cellNode),
       };
     }
 
@@ -94,6 +117,20 @@ function formatScalar(value: CellScalar): string {
   return String(value);
 }
 
+function serializeCellStyle(style: CellStyle, indent: string): string[] {
+  const lines: string[] = [];
+  const fontProperties = [
+    style.bold === undefined ? "" : `bold=${formatScalar(style.bold)}`,
+    style.italic === undefined ? "" : `italic=${formatScalar(style.italic)}`,
+    style.foreground ? `color=${JSON.stringify(style.foreground)}` : "",
+  ].filter(Boolean);
+  if (fontProperties.length > 0) lines.push(`${indent}font ${fontProperties.join(" ")}`);
+  if (style.background) lines.push(`${indent}fill ${JSON.stringify(style.background)}`);
+  if (style.horizontalAlign) lines.push(`${indent}align horizontal=${JSON.stringify(style.horizontalAlign)}`);
+  if (style.numberFormat) lines.push(`${indent}number-format ${JSON.stringify(style.numberFormat)}`);
+  return lines;
+}
+
 export function serializeSpreadsheetSource(workbook: SpreadsheetWorkbook): string {
   const lines: string[] = [
     'spreadsheet version="1" {',
@@ -112,7 +149,13 @@ export function serializeSpreadsheetSource(workbook: SpreadsheetWorkbook): strin
       const valuePart = cell.formula
         ? `formula=${JSON.stringify(cell.formula)}`
         : `value=${formatScalar(cell.value)}`;
-      lines.push(`        cell ${JSON.stringify(cell.address)} ${valuePart}`);
+      const styleLines = cell.style ? serializeCellStyle(cell.style, "            ") : [];
+      if (styleLines.length === 0) {
+        lines.push(`        cell ${JSON.stringify(cell.address)} ${valuePart}`);
+      } else {
+        lines.push(`        cell ${JSON.stringify(cell.address)} ${valuePart} {`);
+        lines.push(...styleLines, "        }");
+      }
     }
     lines.push("    }");
     if (sheetIndex < workbook.sheets.length - 1) lines.push("");
