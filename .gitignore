@@ -6,3 +6,6 @@ target/
 .idea/
 .vscode/
 apps/desktop/src-tauri/gen/
+# Full app-server bindings are reproducible but extremely broad. The generator
+# checks them and commits only Office IDE's compact, versioned adapter surface.
+packages/codex-protocol/generated/

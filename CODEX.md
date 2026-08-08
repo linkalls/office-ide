@@ -38,7 +38,7 @@ history / undo / redo
 | --- | --- | --- | --- |
 | Phase 0 — Foundation | 🟡 | Bun monorepo、React/Vite shell、Tauri 2/Rustの雛形、Explorer、tabs、command palette、resource-neutralなeditor shell、browser local autosave/recovery | 実workspace directoryの作成/読込/保存、Tauri commandの実接続、Rust toolchain上でのdesktop起動確認 |
 | Phase 1 — Spreadsheet Core | 🟡 | Spreadsheet IR、stable sheet ID、複数sheet lifecycle、KDL MVP parser/serializer、Grid/Source双方向更新、draft確定型cell/formula編集、Shift range選択、相対数式フィル、cell style、row/columnのsize・複数挿入・削除semantic operation、A1数式参照shift、基本数式engine、構文診断、version付きautosave、基本transaction、Undo/Redo | Univer Sheets、Excel互換の完全な数式計算、named style、ドラッグ選択、AST-preserving patch、filesystem永続化、完全なKDL 2.0 |
-| Phase 2 — Agent Infrastructure | 🟡 | Agent pane、Claude/Codex/Cursor/Shell tabs、context表示、local planner、proposal review、Agent attribution、append-only History、Agent card lifecycle同期、Rust所有のCodex app-server JSONL host、initialize/thread/turn command、frontend event reducer、実server request由来の4択approval UI | Rust/Codex実機compile・signed-in smoke、generated schemaの型適用、再接続/resume、他providerのxterm.js/portable-pty、sheetctl、local IPC、Skills、完全なsemantic diff |
+| Phase 2 — Agent Infrastructure | 🟡 | Agent pane、Claude/Codex/Cursor/Shell tabs、context表示、local planner、proposal review、Agent attribution、append-only History、Agent card lifecycle同期、Rust所有のCodex app-server JSONL host、認証gate、initialize/thread start+resume/turn start+interrupt、host reattach/reconnect、frontend event reducer、実server request由来の4択approval UI、0.147.0 generated approval adapter、signed-in real turn smoke | Tauri window内の実approval round-trip、saved thread picker、Activity view、他providerのxterm.js/portable-pty、sheetctl、local IPC、Skills、完全なsemantic diff |
 | Phase 3 — XLSX | ⬜ | なし | importer/exporter、compatibility report、opaque OOXML preservation |
 | Phase 4 — Document Core | ⬜ | Explorer上のdocument見本のみ | Univer Docs、Document IR、Djot、layout KDL、双方向同期、docctl、Document Skill |
 | Phase 5 — DOCX | ⬜ | なし | importer/exporter、compatibility report、opaque OOXML preservation |
@@ -119,12 +119,12 @@ bun run build
 直近の検証結果:
 
 - TypeScript typecheck: pass
-- Bun tests: 44 passed / 0 failed
+- Bun tests: 47 passed / 0 failed
 - Vite production build: pass
 - Browser QA: 文字単位のAgent prompt入力、地域別集計proposal review、31 operations適用、Agent History、Undo/Redo、Agent cardのReverted/Re-applied同期、reload recoveryがpass。売上50万円以上の4行を検出し24 operations適用/Undoもpass。1600×900と980×760でbody overflowなし、console warning/errorなし
 - README media QA: 22秒/440 frames/20fps/1920×1080。2400×1350 sourceから高品質縮小し、大型カーソルの各target到達、Undo後History REVERTED/Agent card Reverted、Redo後History APPLIED/Agent card Re-appliedを検証し、MP4全体をffmpegで再デコード済み
-- Rust/Tauri compile: 未確認（検証環境にRust toolchainなし）。Codex app-server host追加後も同じ制約で未確認
-- Codex CLI smoke: 未確認（検証環境にCodex CLIなし）
+- Rust/Tauri compile: GitHub ActionsのUbuntu 24.04でworkspace check/test/clippyがpass。追加runtime sliceも同じCIで継続検証する
+- Codex CLI smoke: `codex-cli 0.147.0`、ChatGPT login、read-only ephemeral turnでpass
 
 ## 6. 次に実装する順序
 
@@ -241,7 +241,7 @@ bun run tauri dev
 - version付きbrowser autosave/recoveryはあるが、filesystem persistenceとworkspace pickerは未実装。
 - UIはdark themeのみ。
 - Agent plannerは平均単価/税込売上/売上しきい値強調/地域別集計sheetの4レシピに限定した決定的rule engineで、LLMや実CLIではない。PTY Agentと承認境界の設計は`docs/AGENT-RUNTIME.md`に固定済み。
-- unit testsはformula/sheet-source/operations/persistence/agent-planner/history/Codex runtime reducerの44件。Playwright smoke QAは手動実行で、README demoは`bun run demo:record`で再生成できる。正式なTauri/Codex integration/visual regression suiteは未整備。
+- unit testsはformula/sheet-source/operations/persistence/agent-planner/history/Codex runtime reducerの47件。`bun run codex:smoke --turn`は実CLIのread-only ephemeral turnを検証する。Playwright smoke QAは手動実行で、README demoは`bun run demo:record`で再生成できる。Tauri window内のapproval/exit visual integration suiteは未整備。
 
 ## 9. Codexへの作業ルール
 

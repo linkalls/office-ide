@@ -4,11 +4,14 @@ import {
   CheckCircle2,
   ChevronRight,
   LoaderCircle,
+  Power,
+  RotateCcw,
   Send,
   Sheet,
   ShieldCheck,
   Sparkles,
   TerminalSquare,
+  Square,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -177,6 +180,39 @@ export function AgentPane({ workspace }: Props) {
             {runtimeBusy ? <LoaderCircle className="spin" size={11} /> : <ShieldCheck size={11} />}
             {usesCodexRuntime ? codexRuntime.phase : "Local planner"}
           </small>
+          {usesCodexRuntime ? (
+            <span className="runtime-actions">
+              {codexRuntime.phase === "running" ? (
+                <button
+                  type="button"
+                  title="Interrupt the active Codex turn"
+                  onClick={() => void codexRuntime.cancelTurn()}
+                >
+                  <Square size={11} /> Stop turn
+                </button>
+              ) : null}
+              {codexRuntime.phase === "error"
+              || codexRuntime.phase === "exited"
+              || codexRuntime.phase === "disconnected" ? (
+                <button
+                  type="button"
+                  title="Restart Codex app-server"
+                  onClick={() => void codexRuntime.reconnect()}
+                >
+                  <RotateCcw size={11} /> Reconnect
+                </button>
+              ) : null}
+              {codexRuntime.phase === "ready" ? (
+                <button
+                  type="button"
+                  title="Stop Codex app-server"
+                  onClick={() => void codexRuntime.disconnect()}
+                >
+                  <Power size={11} /> Disconnect
+                </button>
+              ) : null}
+            </span>
+          ) : null}
         </div>
         <p className="agent-line">
           <ChevronRight size={13} />

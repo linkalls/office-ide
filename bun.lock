@@ -16,6 +16,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@fontsource-variable/noto-sans-jp": "^5.3.0",
+        "@office-ide/codex-protocol": "workspace:*",
         "@office-ide/formula": "workspace:*",
         "@office-ide/operations": "workspace:*",
         "@office-ide/protocol": "workspace:*",
@@ -35,6 +36,10 @@
         "typescript": "^5.9.2",
         "vite": "^7.1.4",
       },
+    },
+    "packages/codex-protocol": {
+      "name": "@office-ide/codex-protocol",
+      "version": "0.1.0",
     },
     "packages/core/operations": {
       "name": "@office-ide/operations",
@@ -177,6 +182,8 @@
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
     "@napi-rs/lzma-linux-x64-gnu": ["@napi-rs/lzma-linux-x64-gnu@1.5.1", "", { "os": "linux", "cpu": "x64" }, "sha512-oTXEIha4SsuXdTA4Iyskj0kpdx2yVXdhd75c2v3xGrHFfVMsbhTPZU/nMPL4sWKo4pBHm3aucLaqGlF696dTyQ=="],
+
+    "@office-ide/codex-protocol": ["@office-ide/codex-protocol@workspace:packages/codex-protocol"],
 
     "@office-ide/desktop": ["@office-ide/desktop@workspace:apps/desktop"],
 

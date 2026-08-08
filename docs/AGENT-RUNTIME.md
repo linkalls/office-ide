@@ -4,11 +4,12 @@
 
 The first Tauri connection slice is implemented in `apps/desktop/src-tauri/src/codex_host.rs`, `apps/desktop/src/state/codexRuntime.ts`, and `apps/desktop/src/state/useCodexRuntime.ts`.
 
-- Implemented: single Rust-owned child process, JSONL stdio, request routing, 20-second timeout, initialize → initialized ordering, thread/start, turn/start, stderr/protocol diagnostics, shutdown, normalized frontend event reducer, streamed Agent message merging, turn/error states, and four-way command/file approval decisions.
+- Implemented: single Rust-owned child process, JSONL stdio, request routing, 20-second timeout, initialize → initialized ordering, account/read authentication gate, thread start/resume, turn start/interrupt, host status/reattach, explicit reconnect/disconnect, stderr/protocol diagnostics, shutdown, normalized frontend event reducer, streamed Agent message merging, turn/error states, and four-way command/file approval decisions.
 - Preserved: browser preview is explicitly the local planner; desktop connection failures never silently masquerade as Codex success; Office semantic Apply remains separate from Codex runtime approval.
-- Verification still required on a desktop with Rust and signed-in Codex installed: Rust compile/tests, generated schema adoption, real initialize/thread/turn smoke, process-exit recovery, and actual approval round-trip.
+- Verified on Ubuntu 24.04 with `codex-cli 0.147.0` and an existing ChatGPT login: version-matched schema generation, `initialize → initialized → account/read → ephemeral thread/start → turn/start → streamed marker → turn/completed`. The smoke uses read-only sandboxing, no approvals, and does not retain the thread.
+- Verification still required in the actual Tauri window: real server-initiated approval round-trip, visual reconnect/cancel interaction, and process-exit recovery while a turn is active.
 
-Generate the installed-CLI schemas with `bun run codex:schema` before tightening wire types.
+`bun run codex:schema` generates the installed CLI's complete bindings into an ignored directory, verifies the shared command/file approval literals, and updates the compact checked-in `@office-ide/codex-protocol` adapter. `bun run codex:smoke --turn` runs the redacted real-CLI lifecycle check.
 
 ## Product model
 
@@ -137,9 +138,9 @@ Undo marks the original History entry `REVERTED`; it does not delete it. Redo ma
 
 ## Implementation order
 
-1. Compile and smoke the implemented Rust stdio lifecycle against a signed-in Codex CLI.
-2. Generate version-matched schema and replace tolerant envelopes with generated wire types.
-3. Complete reconnect/resume and the structured activity bus shared by Chat and Activity.
+1. ✅ Compile the Rust host in CI and smoke stdio lifecycle against a signed-in Codex CLI.
+2. 🟡 Generate version-matched schema and replace tolerant envelopes with generated wire types. The approval adapter is pinned; broad notification envelopes remain tolerant.
+3. 🟡 Complete reconnect/resume and the structured activity bus shared by Chat and Activity. Host recovery controls exist; saved-thread selection and a separate Activity view remain.
 4. `xterm.js` plus Rust `portable-pty` for Claude/Cursor/Shell and raw terminal access.
 5. `sheetctl` local IPC with read-only context/range commands.
 6. Blocking semantic proposal handshake for mutating commands.
