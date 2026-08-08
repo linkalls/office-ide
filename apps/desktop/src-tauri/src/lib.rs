@@ -26,11 +26,10 @@ async fn codex_start(app: AppHandle, host: State<'_, CodexHost>) -> Result<Value
 }
 
 #[tauri::command]
-async fn codex_start_thread(
-    host: State<'_, CodexHost>,
-    cwd: String,
-) -> Result<Value, String> {
-    host.start_thread(cwd).await.map_err(|error| error.to_string())
+async fn codex_start_thread(host: State<'_, CodexHost>, cwd: String) -> Result<Value, String> {
+    host.start_thread(cwd)
+        .await
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
