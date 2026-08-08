@@ -1,0 +1,9 @@
+{
+  "name": "@office-ide/operations",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@office-ide/spreadsheet-ir": "workspace:*"
+  }
+}

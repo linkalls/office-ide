@@ -1,0 +1,180 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  applySpreadsheetOperations,
+  createTransaction,
+  type Transaction,
+} from "@office-ide/operations";
+import type { Diagnostic, EditorContext } from "@office-ide/protocol";
+import {
+  parseSpreadsheetSource,
+  serializeSpreadsheetSource,
+} from "@office-ide/sheet-source";
+import {
+  getActiveSheet,
+  type CellScalar,
+  type SpreadsheetWorkbook,
+} from "@office-ide/spreadsheet-ir";
+import { SAMPLE_SHEET_SOURCE } from "../data/sampleSource";
+
+export type WorkbenchView = EditorContext["activeView"];
+
+interface HistoryEntry {
+  transaction: Transaction;
+  before: SpreadsheetWorkbook;
+  after: SpreadsheetWorkbook;
+}
+
+const initialParse = parseSpreadsheetSource(SAMPLE_SHEET_SOURCE);
+if (!initialParse.workbook) throw new Error("Bundled spreadsheet source is invalid");
+const initialWorkbook = initialParse.workbook;
+
+export function useOfficeWorkspace() {
+  const [workbook, setWorkbook] = useState<SpreadsheetWorkbook>(initialWorkbook);
+  const [source, setSource] = useState(SAMPLE_SHEET_SOURCE);
+  const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [redoStack, setRedoStack] = useState<HistoryEntry[]>([]);
+  const [activeCell, setActiveCell] = useState("C17");
+  const [selection, setSelection] = useState("A2:F15");
+  const [activeView, setActiveView] = useState<WorkbenchView>("source");
+  const [agentOpen, setAgentOpen] = useState(true);
+  const [explorerOpen, setExplorerOpen] = useState(true);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [activeResource, setActiveResource] = useState("sales");
+  const sourceUpdateOrigin = useRef<"visual" | "source">("visual");
+
+  const activeSheet = useMemo(() => getActiveSheet(workbook), [workbook]);
+
+  const applyCellEdit = useCallback(
+    (address: string, nextValue: string) => {
+      const parsed: CellScalar = /^-?\d+(\.\d+)?$/.test(nextValue)
+        ? Number(nextValue)
+        : nextValue;
+      const before = workbook;
+      const operation = nextValue.startsWith("=")
+        ? {
+            type: "set-formula" as const,
+            sheetId: activeSheet.id,
+            address,
+            formula: nextValue.slice(1),
+          }
+        : {
+            type: "set-cell-value" as const,
+            sheetId: activeSheet.id,
+            address,
+            value: parsed,
+          };
+      const after = applySpreadsheetOperations(before, [operation]);
+      const transaction = createTransaction(`Changed ${address}`, [operation]);
+      sourceUpdateOrigin.current = "visual";
+      setWorkbook(after);
+      setSource(serializeSpreadsheetSource(after));
+      setHistory((entries) => [...entries, { transaction, before, after }]);
+      setRedoStack([]);
+      setDiagnostics([]);
+      setActiveCell(address);
+      setSelection(address);
+    },
+    [activeSheet.id, workbook],
+  );
+
+  const editSource = useCallback((nextSource: string) => {
+    sourceUpdateOrigin.current = "source";
+    setSource(nextSource);
+  }, []);
+
+  useEffect(() => {
+    if (sourceUpdateOrigin.current !== "source") return;
+    const timer = window.setTimeout(() => {
+      const result = parseSpreadsheetSource(source);
+      setDiagnostics(result.diagnostics);
+      if (!result.workbook) return;
+
+      setWorkbook((before) => {
+        const transaction = createTransaction("Updated KDL source", [], { type: "user" });
+        setHistory((entries) => [
+          ...entries,
+          { transaction, before, after: result.workbook! },
+        ]);
+        setRedoStack([]);
+        return result.workbook!;
+      });
+    }, 260);
+    return () => window.clearTimeout(timer);
+  }, [source]);
+
+  const undo = useCallback(() => {
+    setHistory((entries) => {
+      const latest = entries.at(-1);
+      if (!latest) return entries;
+      sourceUpdateOrigin.current = "visual";
+      setWorkbook(latest.before);
+      setSource(serializeSpreadsheetSource(latest.before));
+      setRedoStack((redoEntries) => [...redoEntries, latest]);
+      return entries.slice(0, -1);
+    });
+  }, []);
+
+  const redo = useCallback(() => {
+    setRedoStack((entries) => {
+      const latest = entries.at(-1);
+      if (!latest) return entries;
+      sourceUpdateOrigin.current = "visual";
+      setWorkbook(latest.after);
+      setSource(serializeSpreadsheetSource(latest.after));
+      setHistory((historyEntries) => [...historyEntries, latest]);
+      return entries.slice(0, -1);
+    });
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const modifier = event.ctrlKey || event.metaKey;
+      if (modifier && event.shiftKey && event.key.toLowerCase() === "p") {
+        event.preventDefault();
+        setPaletteOpen((open) => !open);
+      }
+      if (modifier && event.key.toLowerCase() === "j") {
+        event.preventDefault();
+        setAgentOpen((open) => !open);
+      }
+      if (modifier && event.key.toLowerCase() === "z") {
+        event.preventDefault();
+        if (event.shiftKey) redo();
+        else undo();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [redo, undo]);
+
+  return {
+    workbook,
+    activeSheet,
+    source,
+    diagnostics,
+    history,
+    canUndo: history.length > 0,
+    canRedo: redoStack.length > 0,
+    activeCell,
+    selection,
+    activeView,
+    agentOpen,
+    explorerOpen,
+    paletteOpen,
+    activeResource,
+    applyCellEdit,
+    editSource,
+    undo,
+    redo,
+    setActiveCell,
+    setSelection,
+    setActiveView,
+    setAgentOpen,
+    setExplorerOpen,
+    setPaletteOpen,
+    setActiveResource,
+  };
+}
+
+export type OfficeWorkspace = ReturnType<typeof useOfficeWorkspace>;

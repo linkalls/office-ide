@@ -1,0 +1,12 @@
+office-project version="1" {
+    metadata {
+        title "Office IDE Development"
+    }
+
+    resource "sales" type="spreadsheet" path="./examples/sales.office/sheets/sales.kdl"
+
+    settings {
+        autosave #true
+        locale "ja-JP"
+    }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "@office-ide/sheet-source",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@office-ide/kdl": "workspace:*",
+    "@office-ide/protocol": "workspace:*",
+    "@office-ide/spreadsheet-ir": "workspace:*"
+  }
+}

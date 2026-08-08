@@ -1,0 +1,7 @@
+office-project version="1" {
+    metadata {
+        title "2026 Sales Report"
+    }
+
+    resource "sales" type="spreadsheet" path="./sheets/sales.kdl"
+}
