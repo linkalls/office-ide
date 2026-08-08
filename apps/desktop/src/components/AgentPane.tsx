@@ -30,6 +30,7 @@ const AGENT_SUGGESTIONS = [
   "Add an average unit price formula to column G",
   "G列に税込売上を追加して",
   "売上50万円以上を強調して",
+  "地域別の売上集計シートを作って",
 ] as const;
 
 export function AgentPane({ workspace }: Props) {

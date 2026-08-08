@@ -357,7 +357,7 @@ textarea:focus-visible {
 .agent-proposal { margin: 12px 0; padding: 11px; border: 1px solid #315b87; border-radius: 6px; background: linear-gradient(145deg, #112237, #0e1a28); box-shadow: inset 3px 0 0 var(--accent); }
 .proposal-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .proposal-heading span { display: flex; align-items: center; gap: 5px; color: #79baff; font: 700 10px Inter, sans-serif; }
-.proposal-heading code { padding: 2px 5px; border-radius: 3px; color: #9bc9ff; background: #0a1521; font-size: 8px; }
+.proposal-heading code { padding: 2px 5px; border-radius: 3px; color: #9bc9ff; background: #0a1521; font-family: "SFMono-Regular", Consolas, "Noto Sans JP Variable", monospace; font-size: 8px; }
 .agent-proposal > strong { color: #e2eaf3; font: 700 10px Inter, sans-serif; }
 .agent-proposal > p { margin: 6px 0 8px; color: #9eacbc; line-height: 1.45; }
 .agent-proposal ol { margin: 0 0 10px; padding-left: 20px; color: #8999aa; font-size: 9px; line-height: 1.55; }

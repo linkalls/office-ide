@@ -8,9 +8,9 @@ Agent-first Office Suite。Spreadsheet / Document / Source / Git / Terminal / Ag
 
 <video src="https://raw.githubusercontent.com/linkalls/office-ide/main/docs/media/office-ide-agent-demo.mp4" poster="https://raw.githubusercontent.com/linkalls/office-ide/main/docs/images/office-ide-agent-review.png" controls width="100%"></video>
 
-[▶ 38秒のガイド付きAgent workflow MP4を直接開く](docs/media/office-ide-agent-demo.mp4)
+[▶ 21秒・1080pのAgent workflow MP4を直接開く](docs/media/office-ide-agent-demo.mp4)
 
-大型カーソル、移動軌跡、対象枠、クリック波紋、7段階の字幕付きです。数式の1文字入力から、自然言語の依頼、適用前レビュー、4つのsemantic operation、Agent attribution付きHistory、UndoでG列が消える瞬間、Redo、再起動後のautosave recoveryまで、カーソルを結果へ戻しながら実際に操作しています。
+高DPIで収録した画面を1080pへ高品質縮小し、操作対象へ寄るカメラ、大型カーソル、短い字幕で1つの仕事を追います。`地域別の売上集計シートを作って`と1文字ずつ入力し、31個のsemantic operationをレビュー、適用、Agent attribution付きHistory、Undoで集計sheetが消える瞬間、Redoでの復元までを実際に操作しています。
 
 [▶ Multi-sheet / autosaveの14秒デモ](docs/media/office-ide-demo.mp4)
 
@@ -32,6 +32,7 @@ Agent-first Office Suite。Spreadsheet / Document / Source / Git / Terminal / Ag
 - GridとSourceの双方向更新デモ
 - review-first Agent workflow（自然言語 → proposal → semantic operations → apply）
 - Workbookの現在値を走査する条件付き行強調（日本語/英語、円/万円/k対応）
+- Workbookを地域別に集計し、新しいsummary sheetを生成するAgent action
 - Agent attribution付きHistory / Diffと、Agent変更全体のUndo / Redo
 - セルへの直接キーボード入力、Enter / Shift+Enter / Tab / Shift+Tabナビゲーション
 - Agent context pane、Problems、Terminal surface
@@ -39,17 +40,19 @@ Agent-first Office Suite。Spreadsheet / Document / Source / Git / Terminal / Ag
 
 ## AI workflow
 
-Agent paneへ `Add an average unit price formula to column G`、`G列に税込売上を追加して`、`売上50万円以上を強調して` と入力すると、現在のWorkbook IRを読んで変更案を作ります。提案された範囲・式・操作を確認してからApplyすると、すべてが1つのsemantic transactionとしてGrid、KDL Source、Diff、Historyへ反映されます。変更者はAgentとして記録され、Undo 1回で提案全体を戻せます。
+Agent paneへ `地域別の売上集計シートを作って`、`Add an average unit price formula to column G`、`G列に税込売上を追加して`、`売上50万円以上を強調して` と入力すると、現在のWorkbook IRを読んで変更案を作ります。提案された範囲・集計結果・操作を確認してからApplyすると、すべてが1つのsemantic transactionとしてGrid、KDL Source、Diff、Historyへ反映されます。変更者はAgentとして記録され、Undo 1回で提案全体を戻せます。
 
 ![自然言語から作成された適用前の変更案](docs/images/office-ide-agent-review.png)
+
+地域別集計はC列の売上とF列の地域を読み、地域ごとの売上合計と件数を降順に並べた新しいsheetを生成します。サンプルでは14件を5地域へまとめ、合計5,159,900円を31 operationsで作成します。既存名と衝突する場合もstable IDとsheet名を安全に採番します。
+
+![Agentが生成した地域別集計sheetと実行履歴](docs/images/office-ide-agent-applied.png)
 
 しきい値強調はC列の実データを走査し、条件を満たした行だけをA:Fへstyle operationとして生成します。サンプルでは50万円以上の4行を検出し、24 operationsを1 transactionで適用します。
 
 ![売上50万円以上の4行だけをAgentが抽出・強調した状態](docs/images/office-ide-agent-highlight.png)
 
 現在のplannerはPhase 2の安全な境界を先に検証するための決定的なlocal rule engineです。外部LLMやCodex CLIを呼んだように見せてはいません。実process / PTY / CLI接続は次のPhase 2実装です。
-
-![Agent提案を適用しG列へ式を展開した状態](docs/images/office-ide-agent-applied.png)
 
 ## Grid / Sourceの同期
 

@@ -131,12 +131,122 @@ function createHighSalesHighlightProposal(
   };
 }
 
+function createRegionalSummaryProposal(workbook: SpreadsheetWorkbook): AgentProposal | null {
+  const sourceSheet = getActiveSheet(workbook);
+  const lastRow = findLastDataRow(workbook);
+  const totals = new Map<string, { sales: number; records: number }>();
+
+  for (let row = 2; row <= lastRow; row += 1) {
+    const region = sourceSheet.cells[`F${row}`]?.value;
+    const sales = sourceSheet.cells[`C${row}`]?.value;
+    if (typeof region !== "string" || typeof sales !== "number") continue;
+    const current = totals.get(region) ?? { sales: 0, records: 0 };
+    current.sales += sales;
+    current.records += 1;
+    totals.set(region, current);
+  }
+  if (totals.size === 0) return null;
+
+  const rows = [...totals.entries()]
+    .map(([region, value]) => ({ region, ...value }))
+    .sort((left, right) => right.sales - left.sales || left.region.localeCompare(right.region, "ja"));
+  const baseId = "sheet-region-summary";
+  let sheetId = baseId;
+  let suffix = 2;
+  while (workbook.sheets.some((sheet) => sheet.id === sheetId)) {
+    sheetId = `${baseId}-${suffix}`;
+    suffix += 1;
+  }
+  const existingNames = new Set(workbook.sheets.map((sheet) => sheet.name));
+  let sheetName = "地域別集計";
+  let nameSuffix = 2;
+  while (existingNames.has(sheetName)) {
+    sheetName = `地域別集計${nameSuffix}`;
+    nameSuffix += 1;
+  }
+
+  const headerStyle = {
+    bold: true,
+    foreground: "#eff6ff",
+    background: "#1b3f68",
+    horizontalAlign: "center" as const,
+  };
+  const totalStyle = {
+    bold: true,
+    foreground: "#dbeafe",
+    background: "#173354",
+  };
+  const operations: SpreadsheetOperation[] = [
+    { type: "add-sheet", sheetId, name: sheetName },
+    { type: "set-column-width", sheetId, column: "A", width: 18 },
+    { type: "set-column-width", sheetId, column: "B", width: 24 },
+    { type: "set-column-width", sheetId, column: "C", width: 10 },
+    { type: "set-cell-value", sheetId, address: "A1", value: "地域" },
+    { type: "set-cell-value", sheetId, address: "B1", value: "売上合計（円）" },
+    { type: "set-cell-value", sheetId, address: "C1", value: "件数" },
+    { type: "set-cell-style", sheetId, address: "A1", style: headerStyle },
+    { type: "set-cell-style", sheetId, address: "B1", style: headerStyle },
+    { type: "set-cell-style", sheetId, address: "C1", style: headerStyle },
+  ];
+
+  rows.forEach((row, index) => {
+    const targetRow = index + 2;
+    operations.push(
+      { type: "set-cell-value", sheetId, address: `A${targetRow}`, value: row.region },
+      { type: "set-cell-value", sheetId, address: `B${targetRow}`, value: row.sales },
+      { type: "set-cell-value", sheetId, address: `C${targetRow}`, value: row.records },
+    );
+  });
+
+  const totalRow = rows.length + 2;
+  const grandSales = rows.reduce((sum, row) => sum + row.sales, 0);
+  const grandRecords = rows.reduce((sum, row) => sum + row.records, 0);
+  operations.push(
+    { type: "set-cell-value", sheetId, address: `A${totalRow}`, value: "合計" },
+    { type: "set-cell-value", sheetId, address: `B${totalRow}`, value: grandSales },
+    { type: "set-cell-value", sheetId, address: `C${totalRow}`, value: grandRecords },
+    { type: "set-cell-style", sheetId, address: `A${totalRow}`, style: totalStyle },
+    { type: "set-cell-style", sheetId, address: `B${totalRow}`, style: totalStyle },
+    { type: "set-cell-style", sheetId, address: `C${totalRow}`, style: totalStyle },
+  );
+
+  const topRegions = rows.slice(0, 3)
+    .map((row) => `${row.region} ¥${new Intl.NumberFormat("ja-JP").format(row.sales)}`)
+    .join(" / ");
+
+  return {
+    id: crypto.randomUUID(),
+    title: "Create regional sales summary sheet",
+    explanation: `${sourceSheet.name}の${lastRow - 1}件を地域で集計し、${rows.length}地域の売上合計と件数を新しいsheetへ作成する。`,
+    affectedRange: `${sheetName}!A1:C${totalRow}`,
+    focusCell: "A1",
+    selection: `A1:C${totalRow}`,
+    operations,
+    operationPreview: [
+      `Read C2:C${lastRow} (sales) and F2:F${lastRow} (region)`,
+      `Group ${lastRow - 1} records into ${rows.length} regions`,
+      `Top totals: ${topRegions}`,
+      `Create ${sheetName} with a styled header and grand total`,
+    ],
+  };
+}
+
 /**
  * Phase 2のCLI/LLM接続前にproposal→review→apply境界を検証するlocal planner。
  * 対応外の依頼を勝手に実行せず、提案可能な例を返す。
  */
 export function planAgentRequest(prompt: string, workbook: SpreadsheetWorkbook): AgentPlanResult {
   const normalized = prompt.trim().toLowerCase();
+  if (/(地域別|regional).*(集計|summary)|(?:集計|summary).*(地域別|regional)/.test(normalized)) {
+    const proposal = createRegionalSummaryProposal(workbook);
+    if (proposal) return { ok: true, proposal };
+    return {
+      ok: false,
+      message: "地域と売上金額を持つ行を見つけられなかった。変更は行っていない。",
+      suggestions: ["地域別の売上集計シートを作って", "売上50万円以上を強調して"],
+    };
+  }
+
   if (/(強調|ハイライト|highlight|emphasize)/.test(normalized) && /(売上|sales)/.test(normalized)) {
     const threshold = parseSalesThreshold(prompt);
     if (threshold === null) {
@@ -188,6 +298,7 @@ export function planAgentRequest(prompt: string, workbook: SpreadsheetWorkbook):
       "Add an average unit price formula to column G",
       "G列に税込売上を追加して",
       "売上50万円以上を強調して",
+      "地域別の売上集計シートを作って",
     ],
   };
 }

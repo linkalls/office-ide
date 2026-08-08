@@ -10,6 +10,8 @@ function createSalesWorkbook() {
   sheet.cells.D2 = { address: "D2", value: 4 };
   sheet.cells.C3 = { address: "C3", value: 900 };
   sheet.cells.D3 = { address: "D3", value: 3 };
+  sheet.cells.F2 = { address: "F2", value: "東京" };
+  sheet.cells.F3 = { address: "F3", value: "大阪" };
   return workbook;
 }
 
@@ -59,11 +61,47 @@ describe("local agent planner", () => {
     expect(result.message).toContain("見つからなかった");
   });
 
+  test("groups workbook rows into a new regional summary sheet", () => {
+    const workbook = createSalesWorkbook();
+    const result = planAgentRequest("地域別の売上集計シートを作って", workbook);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.proposal.affectedRange).toBe("地域別集計!A1:C4");
+    expect(result.proposal.operations).toHaveLength(22);
+
+    const changed = applySpreadsheetOperations(workbook, result.proposal.operations);
+    expect(changed.sheets).toHaveLength(2);
+    expect(changed.sheets[1]?.name).toBe("地域別集計");
+    expect(changed.sheets[1]?.cells.A2?.value).toBe("東京");
+    expect(changed.sheets[1]?.cells.B2?.value).toBe(1000);
+    expect(changed.sheets[1]?.cells.A4?.value).toBe("合計");
+    expect(changed.sheets[1]?.cells.B4?.value).toBe(1900);
+  });
+
+  test("creates a collision-free summary sheet name and id", () => {
+    const workbook = createSalesWorkbook();
+    workbook.sheets.push({
+      ...structuredClone(workbook.sheets[0]!),
+      id: "sheet-region-summary",
+      name: "地域別集計",
+      cells: {},
+    });
+    const result = planAgentRequest("Create a regional sales summary", workbook);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.proposal.affectedRange).toBe("地域別集計2!A1:C4");
+    expect(result.proposal.operations[0]).toMatchObject({
+      type: "add-sheet",
+      sheetId: "sheet-region-summary-2",
+      name: "地域別集計2",
+    });
+  });
+
   test("refuses unsupported requests without producing operations", () => {
     const result = planAgentRequest("Make it beautiful somehow", createSalesWorkbook());
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.message).toContain("変更は行っていない");
-    expect(result.suggestions).toHaveLength(3);
+    expect(result.suggestions).toHaveLength(4);
   });
 });
