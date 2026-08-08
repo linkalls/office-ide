@@ -61,9 +61,11 @@ function DiffView({ workspace }: Props) {
         <>
           <div className="diff-path">Sheet: {workspace.activeSheet.name}</div>
           <div className="diff-entry">
-            <span className="diff-marker added">+</span>
+            <span className={`diff-marker ${latest.state === "applied" ? "added" : "reverted"}`}>
+              {latest.state === "applied" ? "+" : "↶"}
+            </span>
             <span>{latest.transaction.label} · {latest.transaction.operations.length} operations · {actorLabel(latest.transaction.actor)}</span>
-            <time>{new Date(latest.transaction.timestamp).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })}</time>
+            <span className="history-state" data-state={latest.state}>{latest.state.toUpperCase()}</span>
           </div>
         </>
       ) : <p className="empty-copy">変更はまだない。</p>}
@@ -76,9 +78,13 @@ function HistoryView({ workspace }: Props) {
     <div className="semantic-view history-list">
       {workspace.history.length === 0 ? <p className="empty-copy">履歴はまだない。</p> : null}
       {[...workspace.history].reverse().map((entry) => (
-        <div className="history-entry" key={entry.transaction.id}>
-          <span className="history-dot" />
-          <div><strong>{entry.transaction.label}</strong><span>{actorLabel(entry.transaction.actor)} · {entry.transaction.operations.length} ops · {new Date(entry.transaction.timestamp).toLocaleTimeString("ja-JP")}</span></div>
+        <div className="history-entry" data-state={entry.state} key={entry.transaction.id}>
+          <span className="history-dot" aria-hidden="true" />
+          <div className="history-copy">
+            <strong>{entry.transaction.label}</strong>
+            <span>{actorLabel(entry.transaction.actor)} · {entry.transaction.operations.length} ops · {new Date(entry.transaction.timestamp).toLocaleTimeString("ja-JP")}</span>
+          </div>
+          <span className="history-state" data-state={entry.state}>{entry.state.toUpperCase()}</span>
         </div>
       ))}
     </div>

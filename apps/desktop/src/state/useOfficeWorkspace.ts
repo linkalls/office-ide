@@ -23,6 +23,11 @@ import {
   saveWorkspaceSnapshot,
 } from "./workspacePersistence";
 import type { AgentProposal } from "./agentPlanner";
+import {
+  createHistoryEntry,
+  setHistoryEntryState,
+  type HistoryEntry,
+} from "./workspaceHistory";
 
 export type WorkbenchView = EditorContext["activeView"];
 type StructureOperationType = Extract<SpreadsheetOperation, { at: number }>["type"];
@@ -32,12 +37,6 @@ interface SelectionBounds {
   lastColumn: number;
   firstRow: number;
   lastRow: number;
-}
-
-interface HistoryEntry {
-  transaction: Transaction;
-  before: SpreadsheetWorkbook;
-  after: SpreadsheetWorkbook;
 }
 
 const initialParse = parseSpreadsheetSource(SAMPLE_SHEET_SOURCE);
@@ -93,6 +92,7 @@ export function useOfficeWorkspace() {
   const [source, setSource] = useState(restoredWorkspace?.source ?? SAMPLE_SHEET_SOURCE);
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [undoStack, setUndoStack] = useState<HistoryEntry[]>([]);
   const [redoStack, setRedoStack] = useState<HistoryEntry[]>([]);
   const [activeCell, setActiveCell] = useState("C17");
   const [selection, setSelection] = useState("A2:F15");
@@ -106,6 +106,17 @@ export function useOfficeWorkspace() {
   );
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(restoredWorkspace?.savedAt ?? null);
   const sourceUpdateOrigin = useRef<"visual" | "source">("visual");
+
+  const recordTransaction = useCallback((
+    transaction: Transaction,
+    before: SpreadsheetWorkbook,
+    after: SpreadsheetWorkbook,
+  ) => {
+    const entry = createHistoryEntry(transaction, before, after);
+    setHistory((entries) => [...entries, entry]);
+    setUndoStack((entries) => [...entries, entry]);
+    setRedoStack([]);
+  }, []);
 
   const activeSheet = useMemo(() => getActiveSheet(workbook), [workbook]);
   const selectionBounds = useMemo(() => getSelectionBounds(selection), [selection]);
@@ -163,13 +174,12 @@ export function useOfficeWorkspace() {
       sourceUpdateOrigin.current = "visual";
       setWorkbook(after);
       setSource(serializeSpreadsheetSource(after));
-      setHistory((entries) => [...entries, { transaction, before, after }]);
-      setRedoStack([]);
+      recordTransaction(transaction, before, after);
       setDiagnostics(getWorkbookDiagnostics(after));
       setActiveCell(address);
       setSelection(address);
     },
-    [activeSheet.id, workbook],
+    [activeSheet.id, recordTransaction, workbook],
   );
 
   const editSource = useCallback((nextSource: string) => {
@@ -191,11 +201,10 @@ export function useOfficeWorkspace() {
       sourceUpdateOrigin.current = "visual";
       setWorkbook(after);
       setSource(serializeSpreadsheetSource(after));
-      setHistory((entries) => [...entries, { transaction, before, after }]);
-      setRedoStack([]);
+      recordTransaction(transaction, before, after);
       setDiagnostics(getWorkbookDiagnostics(after));
     },
-    [activeCell, activeSheet.id, workbook],
+    [activeCell, activeSheet.id, recordTransaction, workbook],
   );
 
   const applyColumnWidth = useCallback(
@@ -213,11 +222,10 @@ export function useOfficeWorkspace() {
       sourceUpdateOrigin.current = "visual";
       setWorkbook(after);
       setSource(serializeSpreadsheetSource(after));
-      setHistory((entries) => [...entries, { transaction, before, after }]);
-      setRedoStack([]);
+      recordTransaction(transaction, before, after);
       setDiagnostics(getWorkbookDiagnostics(after));
     },
-    [activeSheet.id, workbook],
+    [activeSheet.id, recordTransaction, workbook],
   );
 
   const applyRowHeight = useCallback(
@@ -235,11 +243,10 @@ export function useOfficeWorkspace() {
       sourceUpdateOrigin.current = "visual";
       setWorkbook(after);
       setSource(serializeSpreadsheetSource(after));
-      setHistory((entries) => [...entries, { transaction, before, after }]);
-      setRedoStack([]);
+      recordTransaction(transaction, before, after);
       setDiagnostics(getWorkbookDiagnostics(after));
     },
-    [activeSheet.id, workbook],
+    [activeSheet.id, recordTransaction, workbook],
   );
 
   const applySheetStructure = useCallback(
@@ -262,11 +269,10 @@ export function useOfficeWorkspace() {
       sourceUpdateOrigin.current = "visual";
       setWorkbook(after);
       setSource(serializeSpreadsheetSource(after));
-      setHistory((entries) => [...entries, { transaction, before, after }]);
-      setRedoStack([]);
+      recordTransaction(transaction, before, after);
       setDiagnostics(getWorkbookDiagnostics(after));
     },
-    [activeSheet.id, workbook],
+    [activeSheet.id, recordTransaction, workbook],
   );
 
   const applyFormulaFill = useCallback(() => {
@@ -285,10 +291,9 @@ export function useOfficeWorkspace() {
     sourceUpdateOrigin.current = "visual";
     setWorkbook(after);
     setSource(serializeSpreadsheetSource(after));
-    setHistory((entries) => [...entries, { transaction, before, after }]);
-    setRedoStack([]);
+    recordTransaction(transaction, before, after);
     setDiagnostics(getWorkbookDiagnostics(after));
-  }, [activeCell, activeSheet.cells, activeSheet.id, canFillFormula, selection, selectionBounds, workbook]);
+  }, [activeCell, activeSheet.cells, activeSheet.id, canFillFormula, recordTransaction, selection, selectionBounds, workbook]);
 
   const applyAgentProposal = useCallback((proposal: AgentProposal, agent = "Codex") => {
     const before = workbook;
@@ -301,12 +306,11 @@ export function useOfficeWorkspace() {
     sourceUpdateOrigin.current = "visual";
     setWorkbook(after);
     setSource(serializeSpreadsheetSource(after));
-    setHistory((entries) => [...entries, { transaction, before, after }]);
-    setRedoStack([]);
+    recordTransaction(transaction, before, after);
     setDiagnostics(getWorkbookDiagnostics(after));
     setActiveCell(proposal.focusCell);
     setSelection(proposal.selection);
-  }, [workbook]);
+  }, [recordTransaction, workbook]);
 
   const addSheet = useCallback(() => {
     const nextNumber = workbook.sheets.reduce((maximum, sheet) => {
@@ -322,13 +326,12 @@ export function useOfficeWorkspace() {
     sourceUpdateOrigin.current = "visual";
     setWorkbook(after);
     setSource(serializeSpreadsheetSource(after));
-    setHistory((entries) => [...entries, { transaction, before, after }]);
-    setRedoStack([]);
+    recordTransaction(transaction, before, after);
     setDiagnostics(getWorkbookDiagnostics(after));
     setActiveCell("A1");
     setSelection("A1");
     setActiveResource("sales");
-  }, [workbook]);
+  }, [recordTransaction, workbook]);
 
   const activateSheet = useCallback((sheetId: string) => {
     const after = applySpreadsheetOperations(workbook, [{ type: "activate-sheet", sheetId }]);
@@ -348,10 +351,9 @@ export function useOfficeWorkspace() {
     sourceUpdateOrigin.current = "visual";
     setWorkbook(after);
     setSource(serializeSpreadsheetSource(after));
-    setHistory((entries) => [...entries, { transaction, before, after }]);
-    setRedoStack([]);
+    recordTransaction(transaction, before, after);
     setDiagnostics(getWorkbookDiagnostics(after));
-  }, [workbook]);
+  }, [recordTransaction, workbook]);
 
   const deleteSheet = useCallback((sheetId: string) => {
     if (workbook.sheets.length === 1) return;
@@ -363,12 +365,11 @@ export function useOfficeWorkspace() {
     sourceUpdateOrigin.current = "visual";
     setWorkbook(after);
     setSource(serializeSpreadsheetSource(after));
-    setHistory((entries) => [...entries, { transaction, before, after }]);
-    setRedoStack([]);
+    recordTransaction(transaction, before, after);
     setDiagnostics(getWorkbookDiagnostics(after));
     setActiveCell("A1");
     setSelection("A1");
-  }, [workbook]);
+  }, [recordTransaction, workbook]);
 
   const resetWorkspace = useCallback(() => {
     if (typeof window !== "undefined") clearWorkspaceSnapshot(window.localStorage);
@@ -377,6 +378,7 @@ export function useOfficeWorkspace() {
     setSource(SAMPLE_SHEET_SOURCE);
     setDiagnostics([]);
     setHistory([]);
+    setUndoStack([]);
     setRedoStack([]);
     setActiveCell("C17");
     setSelection("A2:F15");
@@ -396,16 +398,12 @@ export function useOfficeWorkspace() {
           result.workbook!.activeSheetId = before.activeSheetId;
         }
         const transaction = createTransaction("Updated KDL source", [], { type: "user" });
-        setHistory((entries) => [
-          ...entries,
-          { transaction, before, after: result.workbook! },
-        ]);
-        setRedoStack([]);
+        recordTransaction(transaction, before, result.workbook!);
         return result.workbook!;
       });
     }, 260);
     return () => window.clearTimeout(timer);
-  }, [source]);
+  }, [recordTransaction, source]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -423,7 +421,7 @@ export function useOfficeWorkspace() {
   }, [workbook]);
 
   const undo = useCallback(() => {
-    const latest = history.at(-1);
+    const latest = undoStack.at(-1);
     if (!latest) return;
     sourceUpdateOrigin.current = "visual";
     setWorkbook(latest.before);
@@ -431,8 +429,13 @@ export function useOfficeWorkspace() {
     setSource(nextSource);
     setDiagnostics(parseSpreadsheetSource(nextSource).diagnostics);
     setRedoStack((entries) => [...entries, latest]);
-    setHistory(history.slice(0, -1));
-  }, [history]);
+    setUndoStack(undoStack.slice(0, -1));
+    setHistory((entries) => setHistoryEntryState(
+      entries,
+      latest.transaction.id,
+      "reverted",
+    ));
+  }, [undoStack]);
 
   const redo = useCallback(() => {
     const latest = redoStack.at(-1);
@@ -442,8 +445,13 @@ export function useOfficeWorkspace() {
     const nextSource = serializeSpreadsheetSource(latest.after);
     setSource(nextSource);
     setDiagnostics(parseSpreadsheetSource(nextSource).diagnostics);
-    setHistory((entries) => [...entries, latest]);
+    setUndoStack((entries) => [...entries, latest]);
     setRedoStack(redoStack.slice(0, -1));
+    setHistory((entries) => setHistoryEntryState(
+      entries,
+      latest.transaction.id,
+      "applied",
+    ));
   }, [redoStack]);
 
   useEffect(() => {
@@ -473,7 +481,7 @@ export function useOfficeWorkspace() {
     source,
     diagnostics,
     history,
-    canUndo: history.length > 0,
+    canUndo: undoStack.length > 0,
     canRedo: redoStack.length > 0,
     activeCell,
     selection,

@@ -307,13 +307,18 @@ textarea:focus-visible {
 .diff-entry { display: grid; grid-template-columns: 20px 1fr auto; align-items: center; min-height: 31px; border-top: 1px solid var(--border-soft); }
 .diff-entry time { color: #68768a; }
 .diff-marker.added { color: var(--green); }
+.diff-marker.reverted { color: #f5bb67; }
 .empty-copy { color: #667589; }
 .history-list { padding-top: 10px; }
-.history-entry { display: flex; gap: 10px; min-height: 41px; }
-.history-entry div { display: flex; flex-direction: column; gap: 3px; }
+.history-entry { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; gap: 10px; min-height: 41px; align-items: start; }
+.history-entry[data-state="reverted"] .history-copy { opacity: .62; }
+.history-copy { display: flex; flex-direction: column; gap: 3px; }
 .history-entry strong { color: #cbd5e1; font-size: 11px; }
 .history-entry span { color: #68778b; font-size: 10px; }
 .history-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-top: 5px; box-shadow: 0 0 0 3px #16345c; }
+.history-entry[data-state="reverted"] .history-dot { background: #d79a3e; box-shadow: 0 0 0 3px #4a3518; }
+.history-state { align-self: start; padding: 2px 6px; border: 1px solid #285840; border-radius: 999px; color: #79d7a3 !important; background: #10261c; font: 700 8px/1.4 Inter, sans-serif; letter-spacing: .05em; }
+.history-state[data-state="reverted"] { border-color: #654a22; color: #f5bb67 !important; background: #2a2013; }
 .no-problems { color: var(--green); }
 .problem-row { min-height: 30px; display: grid; grid-template-columns: 20px 1fr auto; align-items: center; color: #f5bb67; border-bottom: 1px solid var(--border-soft); }
 .problem-row code { color: #7e8b9d; }

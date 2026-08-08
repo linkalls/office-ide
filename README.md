@@ -8,7 +8,7 @@ Agent-first Office Suite。Spreadsheet / Document / Source / Git / Terminal / Ag
 
 <video src="https://raw.githubusercontent.com/linkalls/office-ide/main/docs/media/office-ide-agent-demo.mp4" poster="https://raw.githubusercontent.com/linkalls/office-ide/main/docs/images/office-ide-agent-review.png" controls width="100%"></video>
 
-[▶ 21秒・1080pのAgent workflow MP4を直接開く](docs/media/office-ide-agent-demo.mp4)
+[▶ 22秒・1080pのAgent workflow MP4を直接開く](docs/media/office-ide-agent-demo.mp4)
 
 高DPIで収録した画面を1080pへ高品質縮小し、操作対象へ寄るカメラ、大型カーソル、短い字幕で1つの仕事を追います。`地域別の売上集計シートを作って`と1文字ずつ入力し、31個のsemantic operationをレビュー、適用、Agent attribution付きHistory、Undoで集計sheetが消える瞬間、Redoでの復元までを実際に操作しています。
 
@@ -33,14 +33,14 @@ Agent-first Office Suite。Spreadsheet / Document / Source / Git / Terminal / Ag
 - review-first Agent workflow（自然言語 → proposal → semantic operations → apply）
 - Workbookの現在値を走査する条件付き行強調（日本語/英語、円/万円/k対応）
 - Workbookを地域別に集計し、新しいsummary sheetを生成するAgent action
-- Agent attribution付きHistory / Diffと、Agent変更全体のUndo / Redo
+- append-onlyなAgent attribution付きHistory / Diffと、`REVERTED`状態を残すUndo / Redo
 - セルへの直接キーボード入力、Enter / Shift+Enter / Tab / Shift+Tabナビゲーション
 - Agent context pane、Problems、Terminal surface
 - command paletteとkeyboard shortcuts
 
 ## AI workflow
 
-Agent paneへ `地域別の売上集計シートを作って`、`Add an average unit price formula to column G`、`G列に税込売上を追加して`、`売上50万円以上を強調して` と入力すると、現在のWorkbook IRを読んで変更案を作ります。提案された範囲・集計結果・操作を確認してからApplyすると、すべてが1つのsemantic transactionとしてGrid、KDL Source、Diff、Historyへ反映されます。変更者はAgentとして記録され、Undo 1回で提案全体を戻せます。
+Agent paneへ `地域別の売上集計シートを作って`、`Add an average unit price formula to column G`、`G列に税込売上を追加して`、`売上50万円以上を強調して` と入力すると、現在のWorkbook IRを読んで変更案を作ります。提案された範囲・集計結果・操作を確認してからApplyすると、すべてが1つのsemantic transactionとしてGrid、KDL Source、Diff、Historyへ反映されます。変更者はAgentとして記録され、Undo 1回で提案全体を戻せます。Undoは監査記録を削除せず、元transactionを`REVERTED`として残します。Redoは同じtransactionを重複追加せず`APPLIED`へ戻します。
 
 ![自然言語から作成された適用前の変更案](docs/images/office-ide-agent-review.png)
 

@@ -387,7 +387,12 @@ try {
   await moveCamera(page, cameraPose(1.35, 620, 835), 600);
   await moveCursor(page, page.locator(".sheet-tabs"), "地域別集計が消えた", 500);
   const summaryAfterUndo = await page.getByRole("button", { name: "Open sheet 地域別集計" }).count();
-  await showState(page, "Undo完了 · 31 operationsを一括取消", 650);
+  await showState(page, "Undo完了 · sheetは消えても履歴は残る", 650);
+  await moveCursor(page, historyEntry, "REVERTED · 過去の実行記録", 500);
+  const revertedHistoryText = await page.locator(".history-list").innerText();
+  const historyMarkedReverted = revertedHistoryText.includes("REVERTED")
+    && revertedHistoryText.includes("Create regional sales summary sheet");
+  await hold(page, 450);
 
   await moveCamera(page, cameraPose(1.35, 1480, 70), 550);
   const redoButton = page.locator('.title-actions button[aria-label="Redo"]');
@@ -396,6 +401,9 @@ try {
   const restoredTopSales = page.getByLabel("Cell B2", { exact: true });
   await moveCursor(page, restoredTopSales, "集計sheetを完全復元", 500);
   const summaryAfterRedo = await page.getByRole("button", { name: "Open sheet 地域別集計" }).count();
+  const historyAfterRedo = await page.locator(".history-list").innerText();
+  const historyMarkedApplied = historyAfterRedo.includes("APPLIED")
+    && !historyAfterRedo.includes("REVERTED");
   await showState(page, "Reviewable · Attributed · Reversible", 850);
 
   // End the recorded story here. Recovery and responsive checks continue off-camera.
@@ -460,6 +468,8 @@ try {
     grandTotal,
     summarySerialized,
     agentActorRecorded,
+    historyMarkedReverted,
+    historyMarkedApplied,
     summaryAfterUndo,
     summaryAfterRedo,
     recoveredSheet,

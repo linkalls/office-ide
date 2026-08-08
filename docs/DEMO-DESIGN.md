@@ -18,8 +18,8 @@ Ask for a regional sales summary
 → review the derived totals and 31 operations
 → apply a new summary sheet
 → verify Agent attribution in History
-→ Undo the entire sheet
-→ Redo and recover it
+→ Undo the entire sheet while History keeps it as REVERTED
+→ Redo the same transaction and return it to APPLIED
 ```
 
 ## Recording constraints
@@ -31,7 +31,7 @@ Ask for a regional sales summary
 - Move the large cursor to the actual target before every click and validate its coordinates.
 - Remove target frames when the target disappears; do not leave unexplained overlays.
 - Keep captions short and place them away from the active UI.
-- Show the proposal, the concrete table result, attribution, Undo, and Redo.
+- Show the proposal, the concrete table result, attribution, Undo, and Redo. History must never become empty after Undo.
 - Fail recording on browser warnings/errors, viewport overflow, incorrect summary data, broken recovery, or an undecodable MP4.
 
 Run `bun run demo:record` to reproduce both the video and its README poster images.
