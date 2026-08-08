@@ -140,3 +140,23 @@ History is an append-only audit surface, not the Undo stack. Each original trans
 ## Keyboard editing slice
 
 Grid cells keep drafts while typing and now commit plus navigate with Enter, Shift+Enter, Tab, and Shift+Tab. Tab wraps to the neighboring row at the visible grid edge. Thousands separators are normalized only for literal values; formulas retain commas so multi-argument functions are not corrupted. Undo/Redo state transitions avoid nested React state-updater side effects, keeping History keys and redo entries unique under development Strict Mode.
+
+## Locked Phase 2 Codex runtime contract
+
+The Codex runtime itself is not implemented yet. The implementation target is now fixed so a future UI cannot be mistaken for a working integration:
+
+```text
+React Chat / Activity
+  ↕ typed Tauri boundary
+Rust process + JSON-RPC owner
+  ↕ stdio JSONL
+codex app-server
+```
+
+Codex uses the official app-server rich-client integration. Office IDE will not scrape the Codex TUI, overlay controls on it, inject a finished fake transcript, or silently route a failed Codex connection to the deterministic local planner. The Rust host owns the process and credentials boundary; the frontend receives normalized events. The installed CLI generates the version-matched wire schema.
+
+The two approval domains remain separate. A Codex command/sandbox/network approval is rendered only from a real server-initiated app-server request. A Spreadsheet or Document mutation is held as an Office semantic Proposal with Apply/Dismiss. Routine work permitted by the configured Codex sandbox receives no extra Office approval.
+
+Codex activity IDs (`threadId`, `turnId`, item ID) correlate execution; Office `transactionId` controls mutation state. Agent cards derive `Applied`, `Reverted`, and `Re-applied` from append-only History instead of storing their own boolean. Undo therefore preserves both the audit entry and card, marks the transaction `REVERTED`, and exposes Redo when available.
+
+Detailed process states, host commands, failure behavior, approval ownership, and acceptance criteria are specified in `docs/AGENT-RUNTIME.md`. Until those acceptance criteria pass against a real signed-in Codex installation, Phase 2 remains partial.

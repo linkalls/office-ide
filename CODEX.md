@@ -1,6 +1,6 @@
 # Office IDE — Codex handoff
 
-最終更新: 2026-08-08  
+最終更新: 2026-08-09  
 対象仕様: `Office IDE — Agent-first Office Suite`  
 実装基準: このファイルを含む最新の`main`
 
@@ -38,7 +38,7 @@ history / undo / redo
 | --- | --- | --- | --- |
 | Phase 0 — Foundation | 🟡 | Bun monorepo、React/Vite shell、Tauri 2/Rustの雛形、Explorer、tabs、command palette、resource-neutralなeditor shell、browser local autosave/recovery | 実workspace directoryの作成/読込/保存、Tauri commandの実接続、Rust toolchain上でのdesktop起動確認 |
 | Phase 1 — Spreadsheet Core | 🟡 | Spreadsheet IR、stable sheet ID、複数sheet lifecycle、KDL MVP parser/serializer、Grid/Source双方向更新、draft確定型cell/formula編集、Shift range選択、相対数式フィル、cell style、row/columnのsize・複数挿入・削除semantic operation、A1数式参照shift、基本数式engine、構文診断、version付きautosave、基本transaction、Undo/Redo | Univer Sheets、Excel互換の完全な数式計算、named style、ドラッグ選択、AST-preserving patch、filesystem永続化、完全なKDL 2.0 |
-| Phase 2 — Agent Infrastructure | 🟡 | Agent pane、Claude/Codex/Cursor/Shell tabs、context表示、平均単価/税込列/売上しきい値強調/地域別summary sheetのlocal planner、Workbook値走査、proposal review、semantic operation一括適用、Agent attribution、append-only History、Agent card lifecycle同期、REVERTED/APPLIED状態、Undo/Redo | Codex app-server実接続、他providerのxterm.js/portable-pty、sheetctl、local IPC、Skills、完全なsemantic diff |
+| Phase 2 — Agent Infrastructure | 🟡 | Agent pane、Claude/Codex/Cursor/Shell tabs、context表示、平均単価/税込列/売上しきい値強調/地域別summary sheetのlocal planner、Workbook値走査、proposal review、semantic operation一括適用、Agent attribution、append-only History、Agent card lifecycle同期、REVERTED/APPLIED状態、Undo/Redo | Rust管理のCodex app-server実接続、version-matched schema、thread/turn/event/approval adapter、他providerのxterm.js/portable-pty、sheetctl、local IPC、Skills、完全なsemantic diff |
 | Phase 3 — XLSX | ⬜ | なし | importer/exporter、compatibility report、opaque OOXML preservation |
 | Phase 4 — Document Core | ⬜ | Explorer上のdocument見本のみ | Univer Docs、Document IR、Djot、layout KDL、双方向同期、docctl、Document Skill |
 | Phase 5 — DOCX | ⬜ | なし | importer/exporter、compatibility report、opaque OOXML preservation |
@@ -59,7 +59,7 @@ history / undo / redo
 次の見た目は存在するが、backendや実データ処理はまだ接続されていない。
 
 - Terminal: UI surfaceのみ。xterm.jsとPTY transportは未実装。
-- Agent tabs: local plannerのreview/apply経路は動作するが、CLI processと外部LLMは起動しない。対応外の依頼は変更せず拒否する。
+- Agent tabs: local plannerのreview/apply経路は動作するが、Codex app-server、CLI process、外部LLMはまだ起動しない。現在のカードやactivity rowは実Codex transcriptではない。対応外の依頼は変更せず拒否する。
 - Diff: 表示デモ。source/semantic diff engineではない。
 - Problems: KDL parseと数式構文diagnosticsの表示経路はあるが、仕様書のvalidation項目全体は未実装。
 - History: in-memoryのcell/source/Agent変更履歴。Agent attributionと最新transactionのUndo/Redoは動作するが、任意transactionへの永続的revertは未実装。
@@ -127,16 +127,80 @@ bun run build
 
 ## 6. 次に実装する順序
 
-最初にPhase 1の受け入れ条件を本物の構成で満たす。
+次のvertical sliceは、既存proposal境界へ本物のCodex runtimeを接続する。UIを増やす前にprocess/protocol/error stateを通す。
 
-1. `SpreadsheetEditor`へUniver Sheets adapterを実装する。
-2. Visual editを既存のsemantic operationへ変換し、IRを唯一のruntime stateに保つ。
-3. KDL parserをKDL 2.0対応へ進め、CST/ASTとsource spanを保持する。
-4. serializerの全体再生成をやめ、コメントとformatを保つAST-aware patchを実装する。
-5. browser snapshotからfilesystem-backed workspaceへ進め、open/create/save/loadをTauri command経由で実装する。
-6. formula engineを日付・配列・sheet間参照へ拡張し、named styleとtestsを追加する。基本関数、相対数式フィル、複数行列操作は実装済み。
-7. integration testで `source → IR → visual` と `visual → operation → IR → source` を固定する。
-8. Phase 2の既存proposal境界へCodex app-server、他provider用xterm.js/portable-pty、local IPC、`sheetctl`を接続し、Agent paneをChat/Terminalの二層表示にする。Codexのthread/turn/event/approvalはapp-serverから構造化取得し、Office semantic operationsだけをProposal cardでreviewする。
+1. RustでCodex app-serverのstdio lifecycle、request routing、shutdownを実装する。
+2. installed CLIからversion-matched schemaを生成し、initialize/thread/turn/event/approval adapterを実装する。
+3. Tauri command/event境界とfrontend activity reducerを接続し、Codex Chatを実eventだけで描画する。
+4. `sheetctl` local IPCを実装し、mutating commandを既存Office Proposalで停止させる。
+5. Apply/Undo/RedoとAgent card/Historyのcorrelationを実Codex turnからintegration testする。
+6. Claude/Cursor/Shell向けxterm.js/portable-ptyを追加する。Codexの別PTY sessionはapp-server threadと混ぜない。
+7. その後、`SpreadsheetEditor`へUniver Sheets adapterを実装する。
+8. KDL parserのCST/AST・source span、AST-aware patch、filesystem workspace、式拡張、双方向integration testを順に進める。
+
+### Codex app-server接続の実装契約
+
+この項目はPhase 2で次に実装する仕様であり、現時点では未実装。見た目だけのCodex UI、固定transcript、ANSI出力のscrapingを完成扱いにしない。
+
+#### 正式な接続経路
+
+```text
+Office IDE React UI
+  ↕ typed Tauri commands / events
+Rust Codex host
+  ↕ newline-delimited JSON-RPC over stdio
+codex app-server
+  ↕ local Codex login
+Codex runtime
+```
+
+- Rust backendだけが`codex app-server` process、stdin/stdout/stderr、request ID、pending response、shutdownを所有する。WebViewへshell権限やCodex credentialを渡さない。
+- 起動時は`initialize`のresponseを待ってから`initialized`を送り、readyになる前の`thread/start`や`turn/start`を拒否する。
+- promptは`thread/start`または`thread/resume`後に`turn/start`へ送る。`item/started`、delta、`item/completed`、`turn/completed`をTauri event経由で1本のactivity streamへ正規化する。
+- wire typeはインストール済みCodex CLIから`codex app-server generate-ts`または`generate-json-schema`で生成する。推測した完全schemaを手書きしない。
+- 認証はローカルCodexの既存loginを使う。Office IDEへOpenAI API key入力欄を追加せず、tokenをlog、History、frontend state、workspaceへ保存しない。
+- Codexが未install、未login、protocol不一致、handshake timeout、process exitの場合は明示的なerror stateを表示する。local plannerへ黙ってfallbackしてCodexが動いたように見せない。
+
+#### Chat / Terminalの責務
+
+- **Codex Chat**はapp-serverの構造化eventをOffice IDE native UIへ投影する正式surface。Codex AppやVS Code extensionと同じrich-client方式を使い、Codex画面へ独自UIを重ねない。
+- **Codex Activity**は必要に応じてraw JSON-RPC method、command output、stderrを開発者向けに表示できるが、偽のCLI terminalとして装わない。
+- **Terminal/PTTY**はClaude、Cursor、Shellなどgeneric CLI providerの正式surface。Codexを外部terminalで開く機能を追加する場合はapp-server sessionとは別sessionであることを明示し、同じthread/activityとして混ぜない。
+- Chat/Activityのview切替ではprocess、thread、turnを増やさず、同一app-server sessionを観測する。
+
+#### 二つの承認境界
+
+| 対象 | 承認のowner | Office IDEでの扱い |
+| --- | --- | --- |
+| Codexのcommand、sandbox、network、filesystem escalation | Codex app-server | server-initiated approval requestをそのまま構造化表示し、documented decisionを返す。独自の二重approvalは作らない |
+| Spreadsheet/Documentを変更するsemantic operations | Office IDE | range、operation数、diff、validationをProposal cardで確認し、Apply/Dismissする |
+| 通常のworkspace-write内の読み書き | Codex policy | app-serverがapprovalを要求しない限り、Office IDE側で余計なApproveを挟まない |
+
+Codexのapproval cardはapp-server requestが存在するときだけ表示する。Terminalの文字列を監視してApprove buttonを推測生成してはいけない。
+
+#### transactionとAgent cardの唯一の状態源
+
+Office変更をApplyした時点で、Agent cardへ独立した`applied: true`を保存しない。cardは`transactionId`、Codexの`threadId`、`turnId`、可能ならtool item IDだけを保持し、表示状態をappend-only Historyから導出する。
+
+```text
+Proposal → Applied → Reverted → Re-applied
+```
+
+- Apply: Historyにtransactionを追加し`APPLIED`。cardは`Applied`。
+- Undo: transactionを削除せず`REVERTED`へ更新。cardは`Reverted`と`Redo available`。
+- Redo: 同じtransactionを`APPLIED`へ戻す。cardは`Re-applied`。History entryやcardを重複追加しない。
+- 新しい変更後にRedo stackが消えても、過去の`REVERTED` History entryは残す。
+- app-serverのturn完了状態とOffice transaction状態を混同しない。Codex turnが成功してもProposalが未適用ならcardは`Proposal`のまま。
+
+#### 完了判定
+
+1. 実Codex CLIがinstall/login済みのdesktop環境でapp-serverを起動し、initializeからturn completionまで通る。
+2. promptを1回送るとthread/turnが1つだけ作られ、streamed responseとtool activityがChatへ重複なく表示される。
+3. app-serverが要求したapprovalだけが表示され、Accept/Accept for session/Decline/Cancelのresponseが対応request IDへ返る。
+4. mutating `sheetctl` callはIRを直接変更せずProposalで停止し、Apply後だけ1 semantic transactionとして反映される。
+5. Apply → Undo → RedoでHistoryとAgent cardが`APPLIED → REVERTED → APPLIED`へ同期し、監査記録は消えない。
+6. Codex未install、未login、異常終了、invalid JSON、timeoutから安全に復旧でき、fake successを表示しない。
+7. generated schemaとの差分、Rust unit test、frontend reducer test、Tauri integration smoke testを通す。
 
 最小の次ゴール:
 
