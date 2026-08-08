@@ -32,7 +32,7 @@ const child = Bun.spawn(["codex", "app-server"], {
   stderr: "pipe",
 });
 
-const writer = child.stdin.getWriter();
+const stdin = child.stdin;
 const decoder = new TextDecoder();
 let nextRequestId = 1;
 let stdoutBuffer = "";
@@ -49,7 +49,10 @@ const turnCompleted = new Promise<void>((resolve) => {
 });
 
 function write(message: RpcMessage): Promise<void> {
-  return writer.write(new TextEncoder().encode(`${JSON.stringify(message)}\n`));
+  // Bun.spawn exposes a native FileSink for piped stdin rather than a Web
+  // WritableStream. Promise.resolve keeps the call site uniform if Bun changes
+  // the return type between a byte count and a promise in a future release.
+  return Promise.resolve(stdin.write(`${JSON.stringify(message)}\n`)).then(() => undefined);
 }
 
 async function request(method: string, params: unknown): Promise<unknown> {
@@ -174,7 +177,7 @@ try {
     }));
   }
 } finally {
-  await writer.close().catch(() => undefined);
+  stdin.end();
   child.kill();
   await child.exited;
   await stdoutTask.catch(() => undefined);
