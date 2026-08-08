@@ -13,6 +13,7 @@
     "@fontsource-variable/noto-sans-jp": "^5.3.0",
     "@office-ide/formula": "workspace:*",
     "@office-ide/operations": "workspace:*",
+    "@office-ide/codex-protocol": "workspace:*",
     "@office-ide/protocol": "workspace:*",
     "@office-ide/sheet-source": "workspace:*",
     "@office-ide/spreadsheet-ir": "workspace:*",

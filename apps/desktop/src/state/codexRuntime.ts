@@ -32,13 +32,7 @@ export interface CodexServerRequest {
   params: unknown;
 }
 
-// Kept equal to Codex app-server 0.147.0's generated command/file approval
-// decision literals. Rich amendment objects stay out of this first UI slice.
-export type CodexApprovalDecision =
-  | "accept"
-  | "acceptForSession"
-  | "decline"
-  | "cancel";
+export type { CodexApprovalDecision } from "@office-ide/codex-protocol";
 
 export interface CodexRuntimeState {
   phase: CodexRuntimePhase;
@@ -390,3 +384,4 @@ export function readTurnId(response: unknown): string | null {
   const result = asRecord(response);
   return readString(getNestedRecord(result ?? {}, "turn"), "id") ?? null;
 }
+import type { CodexApprovalDecision } from "@office-ide/codex-protocol";
