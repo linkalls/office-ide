@@ -14,6 +14,7 @@
     "codex:schema": "bun scripts/generate-codex-schema.ts",
     "codex:smoke": "bun scripts/smoke-codex-app-server.ts",
     "demo:record": "bun scripts/record-agent-demo.ts",
+    "qa:complete": "bun run typecheck && bun test && bun run build && bun run demo:record",
     "test": "bun test",
     "typecheck": "bun --cwd apps/desktop typecheck",
     "tauri": "bun --cwd apps/desktop tauri"
