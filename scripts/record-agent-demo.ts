@@ -95,7 +95,11 @@ async function installPresentationLayer(page: Page): Promise<void> {
 async function captureFrame(page: Page): Promise<void> {
   frame += 1;
   await page.screenshot({
-    path: join(frameDirectory, `frame-${String(frame).padStart(4, "0")}.png`),
+    // JPEG keeps repeated QA recording fast enough to run as a normal completion
+    // gate while preserving a high-quality 2400×1350 source for the final H.264.
+    path: join(frameDirectory, `frame-${String(frame).padStart(4, "0")}.jpg`),
+    type: "jpeg",
+    quality: 92,
     animations: "disabled",
   });
 }
@@ -461,7 +465,7 @@ try {
     "ffmpeg",
     "-hide_banner", "-loglevel", "error", "-y",
     "-framerate", String(FPS),
-    "-i", join(frameDirectory, "frame-%04d.png"),
+    "-i", join(frameDirectory, "frame-%04d.jpg"),
     "-vf", "scale=1920:1080:flags=lanczos",
     "-c:v", "libx264",
     "-preset", "slow",
