@@ -56,8 +56,9 @@ async fn codex_respond_to_server_request(
 }
 
 #[tauri::command]
-async fn codex_shutdown(host: State<'_, CodexHost>) {
+async fn codex_shutdown(host: State<'_, CodexHost>) -> Result<(), String> {
     host.shutdown().await;
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
