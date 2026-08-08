@@ -33,6 +33,23 @@ function parseCellStyle(cellNode: ReturnType<typeof findKdlChildren>[number]): C
   return Object.values(style).some((value) => value !== undefined) ? style : undefined;
 }
 
+function readPositiveDimension(
+  value: unknown,
+  code: string,
+  label: string,
+  line: number,
+  diagnostics: Diagnostic[],
+): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) return value;
+  diagnostics.push({
+    severity: "error",
+    code,
+    message: `${label} must be a positive number`,
+    line,
+  });
+  return undefined;
+}
+
 export function parseSpreadsheetSource(source: string): SheetSourceParseResult {
   const parsed = parseKdl(source);
   const diagnostics: Diagnostic[] = parsed.diagnostics.map((diagnostic) => ({
@@ -72,6 +89,51 @@ export function parseSpreadsheetSource(source: string): SheetSourceParseResult {
 
   for (const [sheetIndex, sheetNode] of sheetNodes.entries()) {
     const cells: SpreadsheetWorkbook["sheets"][number]["cells"] = {};
+    const columnWidths: Record<string, number> = {};
+    const rowHeights: Record<number, number> = {};
+
+    for (const columnNode of findKdlChildren(sheetNode, "column")) {
+      const column = String(columnNode.arguments[0] ?? "").toUpperCase();
+      if (!/^[A-Z]+$/.test(column)) {
+        diagnostics.push({
+          severity: "error",
+          code: "COLUMN_ADDRESS",
+          message: `Invalid column address: ${column || "(empty)"}`,
+          line: columnNode.line,
+        });
+        continue;
+      }
+      const width = readPositiveDimension(
+        columnNode.properties.width,
+        "COLUMN_WIDTH",
+        `Width for column ${column}`,
+        columnNode.line,
+        diagnostics,
+      );
+      if (width !== undefined) columnWidths[column] = width;
+    }
+
+    for (const rowNode of findKdlChildren(sheetNode, "row")) {
+      const row = rowNode.arguments[0];
+      if (typeof row !== "number" || !Number.isInteger(row) || row < 1) {
+        diagnostics.push({
+          severity: "error",
+          code: "ROW_ADDRESS",
+          message: `Invalid row address: ${String(row ?? "(empty)")}`,
+          line: rowNode.line,
+        });
+        continue;
+      }
+      const height = readPositiveDimension(
+        rowNode.properties.height,
+        "ROW_HEIGHT",
+        `Height for row ${row}`,
+        rowNode.line,
+        diagnostics,
+      );
+      if (height !== undefined) rowHeights[row] = height;
+    }
+
     for (const cellNode of findKdlChildren(sheetNode, "cell")) {
       const address = String(cellNode.arguments[0] ?? "").toUpperCase();
       if (!/^[A-Z]+[1-9]\d*$/.test(address)) {
@@ -98,6 +160,8 @@ export function parseSpreadsheetSource(source: string): SheetSourceParseResult {
       id: `sheet-${sheetIndex + 1}`,
       name: String(sheetNode.arguments[0] ?? `Sheet${sheetIndex + 1}`),
       cells,
+      columnWidths,
+      rowHeights,
       rowCount: 100,
       columnCount: 26,
       frozenRows: 0,
@@ -142,6 +206,17 @@ export function serializeSpreadsheetSource(workbook: SpreadsheetWorkbook): strin
 
   for (const [sheetIndex, sheet] of workbook.sheets.entries()) {
     lines.push(`    sheet ${JSON.stringify(sheet.name)} {`);
+    for (const [column, width] of Object.entries(sheet.columnWidths).sort()) {
+      lines.push(`        column ${JSON.stringify(column)} width=${width}`);
+    }
+    for (const [row, height] of Object.entries(sheet.rowHeights).sort(
+      ([left], [right]) => Number(left) - Number(right),
+    )) {
+      lines.push(`        row ${row} height=${height}`);
+    }
+    if (Object.keys(sheet.columnWidths).length > 0 || Object.keys(sheet.rowHeights).length > 0) {
+      lines.push("");
+    }
     const cells = [...Object.values(sheet.cells)].sort((left, right) =>
       left.address.localeCompare(right.address, undefined, { numeric: true }),
     );

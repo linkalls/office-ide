@@ -105,6 +105,50 @@ export function useOfficeWorkspace() {
     [activeCell, activeSheet.id, workbook],
   );
 
+  const applyColumnWidth = useCallback(
+    (column: string, width: number) => {
+      const clampedWidth = Math.min(80, Math.max(4, width));
+      const before = workbook;
+      const operation = {
+        type: "set-column-width" as const,
+        sheetId: activeSheet.id,
+        column,
+        width: clampedWidth,
+      };
+      const after = applySpreadsheetOperations(before, [operation]);
+      const transaction = createTransaction(`Resized column ${column}`, [operation]);
+      sourceUpdateOrigin.current = "visual";
+      setWorkbook(after);
+      setSource(serializeSpreadsheetSource(after));
+      setHistory((entries) => [...entries, { transaction, before, after }]);
+      setRedoStack([]);
+      setDiagnostics([]);
+    },
+    [activeSheet.id, workbook],
+  );
+
+  const applyRowHeight = useCallback(
+    (row: number, height: number) => {
+      const clampedHeight = Math.min(120, Math.max(16, height));
+      const before = workbook;
+      const operation = {
+        type: "set-row-height" as const,
+        sheetId: activeSheet.id,
+        row,
+        height: clampedHeight,
+      };
+      const after = applySpreadsheetOperations(before, [operation]);
+      const transaction = createTransaction(`Resized row ${row}`, [operation]);
+      sourceUpdateOrigin.current = "visual";
+      setWorkbook(after);
+      setSource(serializeSpreadsheetSource(after));
+      setHistory((entries) => [...entries, { transaction, before, after }]);
+      setRedoStack([]);
+      setDiagnostics([]);
+    },
+    [activeSheet.id, workbook],
+  );
+
   useEffect(() => {
     if (sourceUpdateOrigin.current !== "source") return;
     const timer = window.setTimeout(() => {
@@ -187,6 +231,8 @@ export function useOfficeWorkspace() {
     activeResource,
     applyCellEdit,
     applyCellStyle,
+    applyColumnWidth,
+    applyRowHeight,
     editSource,
     undo,
     redo,

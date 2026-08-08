@@ -62,7 +62,13 @@ export function SpreadsheetGrid({ workspace }: Props) {
         <colgroup>
           <col className="row-number-column" />
           {COLUMNS.map((column) => (
-            <col key={column} className={`sheet-column column-${column.toLowerCase()}`} />
+            <col
+              key={column}
+              className={`sheet-column column-${column.toLowerCase()}`}
+              style={workspace.activeSheet.columnWidths[column]
+                ? { width: `${workspace.activeSheet.columnWidths[column] * 7 + 16}px` }
+                : undefined}
+            />
           ))}
         </colgroup>
         <thead>
@@ -81,7 +87,12 @@ export function SpreadsheetGrid({ workspace }: Props) {
         </thead>
         <tbody>
           {ROWS.map((row) => (
-            <tr key={row}>
+            <tr
+              key={row}
+              style={workspace.activeSheet.rowHeights[row]
+                ? { height: `${workspace.activeSheet.rowHeights[row]}px` }
+                : undefined}
+            >
               <th data-active={workspace.activeCell.endsWith(String(row))}>{row}</th>
               {COLUMNS.map((column) => {
                 const address = `${column}${row}`;

@@ -46,10 +46,20 @@ The grid is currently a small in-house adapter used to verify contracts and UI b
 
 ## Phase 1 formatting slice
 
-Cell formatting now follows the same semantic path as value edits:
+Cell formatting follows the same semantic path as value edits:
 
 ```text
 toolbar → set-cell-style operation → Spreadsheet IR → KDL → grid
 ```
 
 The supported first slice is bold, italic, foreground/background color, horizontal alignment, and number-format data. Formatting is represented as child nodes on a cell, so source edits and visual edits round-trip without hiding style state in the UI. Named styles, inheritance, borders, and the full number-format renderer are still pending.
+
+## Phase 1 row and column dimensions
+
+The selected row height and column width use the same semantic path:
+
+```text
+toolbar input → set-row-height / set-column-width → Spreadsheet IR → KDL → grid
+```
+
+KDL uses `column "B" width=24` and `row 2 height=40`. Invalid non-positive dimensions produce diagnostics. Both visual edits and source edits round-trip, and snapshot history makes the changes undoable and redoable. Row/column insertion, deletion, and drag handles remain pending.

@@ -20,6 +20,10 @@ export interface SpreadsheetSheet {
   id: string;
   name: string;
   cells: Record<string, SpreadsheetCell>;
+  /** KDLのcolumn widthを保持する。キーはA1 notationの列名。 */
+  columnWidths: Record<string, number>;
+  /** KDLのrow heightを保持する。キーは1始まりの行番号。 */
+  rowHeights: Record<number, number>;
   rowCount: number;
   columnCount: number;
   frozenRows: number;
@@ -55,6 +59,8 @@ export function createEmptyWorkbook(
         id: "sheet-1",
         name: sheetName,
         cells: {},
+        columnWidths: {},
+        rowHeights: {},
         rowCount: 100,
         columnCount: 26,
         frozenRows: 0,

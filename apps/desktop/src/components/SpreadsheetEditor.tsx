@@ -21,6 +21,10 @@ interface Props {
 export function SpreadsheetEditor({ workspace }: Props) {
   const cell = workspace.activeSheet.cells[workspace.activeCell];
   const formulaValue = cell?.formula ? `=${cell.formula}` : String(cell?.value ?? "");
+  const [, activeColumn = "A", activeRowText = "1"] = workspace.activeCell.match(/^([A-Z]+)(\d+)$/) ?? [];
+  const activeRow = Number(activeRowText);
+  const columnWidth = workspace.activeSheet.columnWidths[activeColumn] ?? 14;
+  const rowHeight = workspace.activeSheet.rowHeights[activeRow] ?? 25;
 
   return (
     <div className="spreadsheet-editor">
@@ -53,6 +57,28 @@ export function SpreadsheetEditor({ workspace }: Props) {
         <button className="toolbar-button" type="button" aria-label="Fill color" aria-pressed={Boolean(cell?.style?.background)} onClick={() => workspace.applyCellStyle({ background: cell?.style?.background ? "" : "#254f7d" })}><PaintBucket size={15} /></button>
         <button className="toolbar-button" type="button"><Percent size={15} /></button>
         <button className="toolbar-button" type="button"><Sigma size={15} /></button>
+        <label className="dimension-control">
+          <span>W</span>
+          <input
+            aria-label={`Column ${activeColumn} width`}
+            type="number"
+            min={4}
+            max={80}
+            value={columnWidth}
+            onChange={(event) => workspace.applyColumnWidth(activeColumn, Number(event.target.value))}
+          />
+        </label>
+        <label className="dimension-control">
+          <span>H</span>
+          <input
+            aria-label={`Row ${activeRow} height`}
+            type="number"
+            min={16}
+            max={120}
+            value={rowHeight}
+            onChange={(event) => workspace.applyRowHeight(activeRow, Number(event.target.value))}
+          />
+        </label>
         <span className="toolbar-spacer" />
         <button className="toolbar-button" type="button"><Search size={15} /></button>
       </div>

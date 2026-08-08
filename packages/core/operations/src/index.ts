@@ -37,6 +37,18 @@ export type SpreadsheetOperation =
       sheetId: string;
       address: string;
       style: CellStyle;
+    }
+  | {
+      type: "set-column-width";
+      sheetId: string;
+      column: string;
+      width: number;
+    }
+  | {
+      type: "set-row-height";
+      sheetId: string;
+      row: number;
+      height: number;
     };
 
 export interface Transaction {
@@ -60,6 +72,16 @@ export function applySpreadsheetOperations(
 
     if (operation.type === "rename-sheet") {
       sheet.name = operation.name;
+      continue;
+    }
+
+    if (operation.type === "set-column-width") {
+      sheet.columnWidths[operation.column.toUpperCase()] = operation.width;
+      continue;
+    }
+
+    if (operation.type === "set-row-height") {
+      sheet.rowHeights[operation.row] = operation.height;
       continue;
     }
 

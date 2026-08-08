@@ -41,4 +41,17 @@ describe("spreadsheet operations", () => {
     expect(changed.sheets[0]?.cells.B2?.value).toBe(2);
     expect(changed.sheets[0]?.cells.B2?.style).toEqual({ italic: true });
   });
+
+  test("applies row and column dimensions immutably", () => {
+    const workbook = createEmptyWorkbook();
+    const resized = applySpreadsheetOperations(workbook, [
+      { type: "set-column-width", sheetId: "sheet-1", column: "b", width: 20 },
+      { type: "set-row-height", sheetId: "sheet-1", row: 2, height: 32 },
+    ]);
+
+    expect(resized.sheets[0]?.columnWidths.B).toBe(20);
+    expect(resized.sheets[0]?.rowHeights[2]).toBe(32);
+    expect(workbook.sheets[0]?.columnWidths).toEqual({});
+    expect(workbook.sheets[0]?.rowHeights).toEqual({});
+  });
 });

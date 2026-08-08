@@ -240,11 +240,14 @@ textarea:focus-visible {
 .toolbar-select.compact { width: 51px; }
 .toolbar-divider { width: 1px; height: 19px; background: var(--border); margin: 0 4px; }
 .toolbar-spacer { flex: 1; }
+.dimension-control { height: 27px; display: flex; align-items: center; gap: 4px; padding: 0 5px; border: 1px solid var(--border); border-radius: 4px; color: #728198; font-size: 9px; }
+.dimension-control input { width: 36px; border: 0; outline: 0; padding: 0; color: #cbd5e1; background: transparent; font-size: 10px; font-variant-numeric: tabular-nums; }
 .editor-work-area { min-height: 0; display: grid; grid-template-rows: minmax(280px, 62%) minmax(170px, 38%); }
 
 .grid-viewport { min-width: 0; min-height: 0; overflow: auto; position: relative; background: #0d1520; display: grid; grid-template-rows: minmax(max-content, 1fr) 30px; }
-.spreadsheet-grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; min-width: 835px; width: 100%; font-family: "Noto Sans JP Variable", Inter, "Yu Gothic UI", sans-serif; font-size: 11px; }
+.spreadsheet-grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; min-width: 835px; width: max-content; font-family: "Noto Sans JP Variable", Inter, "Yu Gothic UI", sans-serif; font-size: 11px; }
 .spreadsheet-grid th, .spreadsheet-grid td { height: 25px; border-right: 1px solid #263446; border-bottom: 1px solid #263446; overflow: hidden; }
+.spreadsheet-grid thead tr { height: 25px; }
 .spreadsheet-grid thead th, .spreadsheet-grid tbody th { position: sticky; z-index: 2; background: #111b28; color: #8390a2; text-align: center; font-weight: 500; }
 .spreadsheet-grid thead th { top: 0; }
 .spreadsheet-grid tbody th { left: 0; width: 37px; }

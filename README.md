@@ -10,6 +10,7 @@ Agent-first Office Suite。Spreadsheet / Document / Source / Git / Terminal / Ag
 - Spreadsheet IR
 - KDL sourceのparse / serialize
 - semantic operationとUndo / Redo
+- cell style、row height、column widthのsemantic editing
 - GridとSourceの双方向更新デモ
 - Agent context pane、Diff、History、Problems、Terminal surface
 - command paletteとkeyboard shortcuts
@@ -39,6 +40,7 @@ bun run build
 
 1. Univer Sheets adapterを`ResourceEditor`として接続
 2. KDL 2.0完全parserへ差し替え
-3. Tauri channel + `portable-pty`によるterminal接続
-4. `sheetctl`とlocal IPC
-5. AST-preserving source patch
+3. row/column挿入・削除とformula engine
+4. Tauri channel + `portable-pty`によるterminal接続
+5. `sheetctl`とlocal IPC
+6. AST-preserving source patch
