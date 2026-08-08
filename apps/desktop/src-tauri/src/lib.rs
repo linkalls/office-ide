@@ -83,8 +83,8 @@ async fn codex_shutdown(app: AppHandle, host: State<'_, CodexHost>) -> Result<()
 }
 
 #[tauri::command]
-async fn codex_status(host: State<'_, CodexHost>) -> CodexHostStatus {
-    host.status().await
+async fn codex_status(host: State<'_, CodexHost>) -> Result<CodexHostStatus, String> {
+    Ok(host.status().await)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
