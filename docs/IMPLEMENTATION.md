@@ -43,3 +43,13 @@ The grid is currently a small in-house adapter used to verify contracts and UI b
 - Source editing uses a styled native textarea instead of CodeMirror 6.
 - The embedded terminal is a functional UI surface; PTY transport lands in Phase 2.
 - Rust/Tauri source is present, but Rust compilation requires a machine with the Rust toolchain installed.
+
+## Phase 1 formatting slice
+
+Cell formatting now follows the same semantic path as value edits:
+
+```text
+toolbar → set-cell-style operation → Spreadsheet IR → KDL → grid
+```
+
+The supported first slice is bold, italic, foreground/background color, horizontal alignment, and number-format data. Formatting is represented as child nodes on a cell, so source edits and visual edits round-trip without hiding style state in the UI. Named styles, inheritance, borders, and the full number-format renderer are still pending.

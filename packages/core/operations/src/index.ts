@@ -1,5 +1,6 @@
 import type {
   CellScalar,
+  CellStyle,
   SpreadsheetWorkbook,
 } from "@office-ide/spreadsheet-ir";
 import {
@@ -30,6 +31,12 @@ export type SpreadsheetOperation =
       type: "rename-sheet";
       sheetId: string;
       name: string;
+    }
+  | {
+      type: "set-cell-style";
+      sheetId: string;
+      address: string;
+      style: CellStyle;
     };
 
 export interface Transaction {
@@ -57,6 +64,16 @@ export function applySpreadsheetOperations(
     }
 
     const previous = sheet.cells[operation.address];
+    if (operation.type === "set-cell-style") {
+      sheet.cells[operation.address] = {
+        address: operation.address,
+        value: previous?.value ?? null,
+        formula: previous?.formula,
+        style: { ...previous?.style, ...operation.style },
+      };
+      continue;
+    }
+
     if (operation.type === "set-cell-value") {
       sheet.cells[operation.address] = {
         address: operation.address,

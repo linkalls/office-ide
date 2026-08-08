@@ -85,6 +85,7 @@ export function SpreadsheetGrid({ workspace }: Props) {
               <th data-active={workspace.activeCell.endsWith(String(row))}>{row}</th>
               {COLUMNS.map((column) => {
                 const address = `${column}${row}`;
+                const cell = cells[address];
                 const isHeader = row === 1 && column !== "G";
                 const isTotal = row === 16 && column !== "G";
                 return (
@@ -93,6 +94,10 @@ export function SpreadsheetGrid({ workspace }: Props) {
                     data-active={workspace.activeCell === address}
                     data-header={isHeader}
                     data-total={isTotal}
+                    style={{
+                      backgroundColor: cell?.style?.background,
+                      color: cell?.style?.foreground,
+                    }}
                     onClick={() => {
                       workspace.setActiveCell(address);
                       workspace.setSelection(address);
@@ -101,6 +106,12 @@ export function SpreadsheetGrid({ workspace }: Props) {
                     <input
                       aria-label={`Cell ${address}`}
                       value={rendered.get(address) ?? ""}
+                      style={{
+                        color: cell?.style?.foreground,
+                        fontWeight: cell?.style?.bold ? 700 : undefined,
+                        fontStyle: cell?.style?.italic ? "italic" : undefined,
+                        textAlign: cell?.style?.horizontalAlign,
+                      }}
                       onFocus={() => {
                         workspace.setActiveCell(address);
                         workspace.setSelection(address);

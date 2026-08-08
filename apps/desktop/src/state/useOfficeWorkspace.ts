@@ -12,6 +12,7 @@ import {
 import {
   getActiveSheet,
   type CellScalar,
+  type CellStyle,
   type SpreadsheetWorkbook,
 } from "@office-ide/spreadsheet-ir";
 import { SAMPLE_SHEET_SOURCE } from "../data/sampleSource";
@@ -82,6 +83,27 @@ export function useOfficeWorkspace() {
     sourceUpdateOrigin.current = "source";
     setSource(nextSource);
   }, []);
+
+  const applyCellStyle = useCallback(
+    (style: CellStyle) => {
+      const before = workbook;
+      const operation = {
+        type: "set-cell-style" as const,
+        sheetId: activeSheet.id,
+        address: activeCell,
+        style,
+      };
+      const after = applySpreadsheetOperations(before, [operation]);
+      const transaction = createTransaction(`Formatted ${activeCell}`, [operation]);
+      sourceUpdateOrigin.current = "visual";
+      setWorkbook(after);
+      setSource(serializeSpreadsheetSource(after));
+      setHistory((entries) => [...entries, { transaction, before, after }]);
+      setRedoStack([]);
+      setDiagnostics([]);
+    },
+    [activeCell, activeSheet.id, workbook],
+  );
 
   useEffect(() => {
     if (sourceUpdateOrigin.current !== "source") return;
@@ -164,6 +186,7 @@ export function useOfficeWorkspace() {
     paletteOpen,
     activeResource,
     applyCellEdit,
+    applyCellStyle,
     editSource,
     undo,
     redo,
