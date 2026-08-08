@@ -4,6 +4,14 @@ Agent-first Office Suite。Spreadsheet / Document / Source / Git / Terminal / Ag
 
 ![Office IDEのSpreadsheet、KDL Source、Agent pane](docs/images/office-ide-overview.png)
 
+## Demo
+
+<video src="https://raw.githubusercontent.com/linkalls/office-ide/main/docs/media/office-ide-demo.mp4" poster="https://raw.githubusercontent.com/linkalls/office-ide/main/docs/images/office-ide-multi-sheet.png" controls width="100%"></video>
+
+[▶ 14秒のMP4デモを直接開く](docs/media/office-ide-demo.mp4)
+
+デモではsheet追加・改名、セルと数式の編集、autosave、ページ再読み込み後の復元、sheet削除とUndoを実際に操作しています。
+
 現在の実装はPhase 0とPhase 1 Spreadsheet Coreの縦方向sliceを対象にしています。
 
 - React + TypeScript + ViteによるIDE shell
@@ -15,6 +23,8 @@ Agent-first Office Suite。Spreadsheet / Document / Source / Git / Terminal / Ag
 - cell style、row height、column widthのsemantic editing
 - row/column挿入・削除とA1数式参照のshift
 - Shiftクリックによるrange選択、相対数式フィル、複数行列の一括挿入・削除
+- 複数sheetの作成・切替・inline改名・削除とUndo
+- stable sheet ID付きKDL、version付きautosave snapshot、再読み込み時の安全なrecovery
 - 四則演算、比較、参照、range、集計・論理・文字列・丸め関数、IF、循環参照検出を含むformula engine
 - 数式構文診断とGrid / Problemsへのエラー表示
 - GridとSourceの双方向更新デモ
@@ -26,6 +36,12 @@ Agent-first Office Suite。Spreadsheet / Document / Source / Git / Terminal / Ag
 セルまたは数式バーへ入力し、Enterかフォーカス移動で確定すると、Spreadsheet IRを経由してKDL Sourceへ反映されます。数式セルを選び、Shiftクリックで範囲を広げて`Σ`を押すと、`$`付き絶対参照を維持したまま相対参照をフィルできます。変更全体は1 transactionなのでUndo / Redoも1回です。
 
 ![G2からG5へROUND式を相対フィルした状態](docs/images/office-ide-formula-fill.png)
+
+## Multi-sheet / Autosave
+
+Explorerと下部sheet tabは同じWorkbook IRを参照します。`＋`でsheetを追加し、tabをダブルクリックして改名できます。sheet削除はsemantic transactionとして記録されるためUndo可能です。validなWorkbookはKDLとしてversion付きsnapshotへ自動保存され、再読み込み時はparserとdiagnosticsを通過したデータだけが復元されます。
+
+![集計sheetを追加してautosave復元した状態](docs/images/office-ide-multi-sheet.png)
 
 ## 開発
 

@@ -6,11 +6,23 @@ interface Props {
 }
 
 export function StatusBar({ workspace }: Props) {
+  const autosaveLabel = workspace.autosaveState === "saving"
+    ? "saving…"
+    : workspace.autosaveState === "error"
+      ? "autosave failed"
+      : "autosaved";
   return (
     <footer className="status-bar">
       <span className="status-primary"><Sparkles size={13} /> Agent-ready</span>
       <span><GitBranch size={13} /> main</span>
-      <span><Radio size={12} /> autosave</span>
+      <span
+        className={workspace.autosaveState === "error" ? "status-error" : ""}
+        title={workspace.lastSavedAt
+          ? `Last saved ${new Date(workspace.lastSavedAt).toLocaleTimeString("ja-JP")}`
+          : "Waiting for first save"}
+      >
+        <Radio size={12} /> {autosaveLabel}
+      </span>
       <span className={workspace.diagnostics.length > 0 ? "status-error" : ""}>
         {workspace.diagnostics.length > 0 ? <AlertTriangle size={13} /> : <Check size={13} />}
         {workspace.diagnostics.length} problems

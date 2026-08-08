@@ -42,7 +42,12 @@ export function Explorer({ workspace }: Props) {
       <div className="pane-title-row">
         <span>WORKSPACE</span>
         <span className="pane-actions">
-          <button className="icon-button subtle" type="button" aria-label="New resource">
+          <button
+            className="icon-button subtle"
+            type="button"
+            aria-label="New spreadsheet"
+            onClick={workspace.addSheet}
+          >
             <Plus size={14} />
           </button>
           <button className="icon-button subtle" type="button" aria-label="More workspace actions">
@@ -53,20 +58,17 @@ export function Explorer({ workspace }: Props) {
 
       <div className="tree-section">
         <button className="tree-heading" type="button">
-          <ChevronDown size={14} /> Spreadsheets <span>2</span>
+          <ChevronDown size={14} /> Spreadsheets <span>{workspace.workbook.sheets.length}</span>
         </button>
-        <ResourceRow
-          icon={<Sheet size={15} />}
-          name="sales"
-          active={workspace.activeResource === "sales"}
-          onClick={() => workspace.setActiveResource("sales")}
-        />
-        <ResourceRow
-          icon={<Sheet size={15} />}
-          name="summary"
-          active={workspace.activeResource === "summary"}
-          onClick={() => workspace.setActiveResource("summary")}
-        />
+        {workspace.workbook.sheets.map((sheet) => (
+          <ResourceRow
+            key={sheet.id}
+            icon={<Sheet size={15} />}
+            name={sheet.name}
+            active={workspace.activeSheet.id === sheet.id && workspace.activeResource !== "report"}
+            onClick={() => workspace.activateSheet(sheet.id)}
+          />
+        ))}
       </div>
 
       <div className="tree-section">

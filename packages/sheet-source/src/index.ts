@@ -158,7 +158,9 @@ export function parseSpreadsheetSource(source: string): SheetSourceParseResult {
     }
 
     workbook.sheets.push({
-      id: `sheet-${sheetIndex + 1}`,
+      id: typeof sheetNode.properties.id === "string"
+        ? sheetNode.properties.id
+        : `sheet-${sheetIndex + 1}`,
       name: String(sheetNode.arguments[0] ?? `Sheet${sheetIndex + 1}`),
       cells,
       columnWidths,
@@ -220,7 +222,7 @@ export function serializeSpreadsheetSource(workbook: SpreadsheetWorkbook): strin
   ];
 
   for (const [sheetIndex, sheet] of workbook.sheets.entries()) {
-    lines.push(`    sheet ${JSON.stringify(sheet.name)} {`);
+    lines.push(`    sheet ${JSON.stringify(sheet.name)} id=${JSON.stringify(sheet.id)} {`);
     for (const [column, width] of Object.entries(sheet.columnWidths).sort()) {
       lines.push(`        column ${JSON.stringify(column)} width=${width}`);
     }

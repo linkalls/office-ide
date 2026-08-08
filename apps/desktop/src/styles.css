@@ -278,8 +278,13 @@ textarea:focus-visible {
 .column-f { width: 86px; }
 .column-g { width: 94px; }
 .sheet-tabs { position: sticky; bottom: 0; display: flex; align-items: center; height: 30px; padding: 0 8px; border-top: 1px solid var(--border); background: #101925; }
-.sheet-tab, .sheet-tab-add { height: 29px; min-width: 64px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: #8e9bae; font-size: 10px; cursor: pointer; }
-.sheet-tab.active { color: white; border-color: var(--accent); }
+.sheet-tab-wrap { position: relative; display: flex; align-items: center; height: 30px; border-bottom: 2px solid transparent; }
+.sheet-tab-wrap[data-active="true"] { border-color: var(--accent); background: #142034; }
+.sheet-tab, .sheet-tab-add { height: 28px; min-width: 64px; border: 0; background: transparent; color: #8e9bae; font-size: 10px; cursor: pointer; }
+.sheet-tab[data-active="true"] { color: white; }
+.sheet-tab-delete { width: 20px; height: 22px; margin-right: 3px; border: 0; border-radius: 3px; color: #66758a; background: transparent; cursor: pointer; }
+.sheet-tab-delete:hover { color: #ff9b9b; background: #2a1b25; }
+.sheet-tab-input { width: 82px; height: 23px; margin: 0 3px; border: 1px solid var(--accent); border-radius: 3px; padding: 0 5px; color: white; background: #0b1420; font-size: 10px; outline: none; }
 .sheet-tab-add { min-width: 28px; font-size: 16px; }
 .sheet-tab-spacer { flex: 1; }
 .zoom-label { font-size: 10px; color: #778598; }

@@ -192,6 +192,19 @@ export type SpreadsheetOperation =
       name: string;
     }
   | {
+      type: "add-sheet";
+      sheetId: string;
+      name: string;
+    }
+  | {
+      type: "delete-sheet";
+      sheetId: string;
+    }
+  | {
+      type: "activate-sheet";
+      sheetId: string;
+    }
+  | {
       type: "set-cell-style";
       sheetId: string;
       address: string;
@@ -244,12 +257,54 @@ export function applySpreadsheetOperations(
   const workbook = cloneWorkbook(source);
 
   for (const operation of operations) {
+    if (operation.type === "add-sheet") {
+      const name = operation.name.trim();
+      if (!name) throw new RangeError("Sheet name cannot be empty");
+      if (workbook.sheets.some((sheet) => sheet.id === operation.sheetId)) {
+        throw new RangeError(`Sheet id already exists: ${operation.sheetId}`);
+      }
+      workbook.sheets.push({
+        id: operation.sheetId,
+        name,
+        cells: {},
+        columnWidths: {},
+        rowHeights: {},
+        rowCount: 100,
+        columnCount: 26,
+        frozenRows: 0,
+        frozenColumns: 0,
+      });
+      workbook.activeSheetId = operation.sheetId;
+      continue;
+    }
+
+    if (operation.type === "delete-sheet") {
+      if (workbook.sheets.length === 1) throw new RangeError("A workbook must keep at least one sheet");
+      const index = workbook.sheets.findIndex((sheet) => sheet.id === operation.sheetId);
+      if (index < 0) throw new RangeError(`Unknown sheet: ${operation.sheetId}`);
+      workbook.sheets.splice(index, 1);
+      if (workbook.activeSheetId === operation.sheetId) {
+        workbook.activeSheetId = workbook.sheets[Math.min(index, workbook.sheets.length - 1)].id;
+      }
+      continue;
+    }
+
+    if (operation.type === "activate-sheet") {
+      if (!workbook.sheets.some((sheet) => sheet.id === operation.sheetId)) {
+        throw new RangeError(`Unknown sheet: ${operation.sheetId}`);
+      }
+      workbook.activeSheetId = operation.sheetId;
+      continue;
+    }
+
     const sheet =
       workbook.sheets.find((candidate) => candidate.id === operation.sheetId) ??
       getActiveSheet(workbook);
 
     if (operation.type === "rename-sheet") {
-      sheet.name = operation.name;
+      const name = operation.name.trim();
+      if (!name) throw new RangeError("Sheet name cannot be empty");
+      sheet.name = name;
       continue;
     }
 

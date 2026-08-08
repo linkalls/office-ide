@@ -17,6 +17,11 @@ import {
   type SpreadsheetWorkbook,
 } from "@office-ide/spreadsheet-ir";
 import { SAMPLE_SHEET_SOURCE } from "../data/sampleSource";
+import {
+  clearWorkspaceSnapshot,
+  loadWorkspaceSnapshot,
+  saveWorkspaceSnapshot,
+} from "./workspacePersistence";
 
 export type WorkbenchView = EditorContext["activeView"];
 type StructureOperationType = Extract<SpreadsheetOperation, { at: number }>["type"];
@@ -79,8 +84,12 @@ export function getSelectionBounds(selection: string): SelectionBounds | null {
 }
 
 export function useOfficeWorkspace() {
-  const [workbook, setWorkbook] = useState<SpreadsheetWorkbook>(initialWorkbook);
-  const [source, setSource] = useState(SAMPLE_SHEET_SOURCE);
+  const [restoredWorkspace] = useState(() =>
+    typeof window === "undefined" ? null : loadWorkspaceSnapshot(window.localStorage));
+  const [workbook, setWorkbook] = useState<SpreadsheetWorkbook>(
+    restoredWorkspace?.workbook ?? initialWorkbook,
+  );
+  const [source, setSource] = useState(restoredWorkspace?.source ?? SAMPLE_SHEET_SOURCE);
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [redoStack, setRedoStack] = useState<HistoryEntry[]>([]);
@@ -91,6 +100,10 @@ export function useOfficeWorkspace() {
   const [explorerOpen, setExplorerOpen] = useState(true);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [activeResource, setActiveResource] = useState("sales");
+  const [autosaveState, setAutosaveState] = useState<"saving" | "saved" | "error">(
+    restoredWorkspace ? "saved" : "saving",
+  );
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(restoredWorkspace?.savedAt ?? null);
   const sourceUpdateOrigin = useRef<"visual" | "source">("visual");
 
   const activeSheet = useMemo(() => getActiveSheet(workbook), [workbook]);
@@ -276,6 +289,82 @@ export function useOfficeWorkspace() {
     setDiagnostics(getWorkbookDiagnostics(after));
   }, [activeCell, activeSheet.cells, activeSheet.id, canFillFormula, selection, selectionBounds, workbook]);
 
+  const addSheet = useCallback(() => {
+    const nextNumber = workbook.sheets.reduce((maximum, sheet) => {
+      const match = sheet.id.match(/^sheet-(\d+)$/);
+      return match ? Math.max(maximum, Number(match[1])) : maximum;
+    }, 0) + 1;
+    const sheetId = `sheet-${nextNumber}`;
+    const name = `Sheet${nextNumber}`;
+    const operation = { type: "add-sheet" as const, sheetId, name };
+    const before = workbook;
+    const after = applySpreadsheetOperations(before, [operation]);
+    const transaction = createTransaction(`Created sheet ${name}`, [operation]);
+    sourceUpdateOrigin.current = "visual";
+    setWorkbook(after);
+    setSource(serializeSpreadsheetSource(after));
+    setHistory((entries) => [...entries, { transaction, before, after }]);
+    setRedoStack([]);
+    setDiagnostics(getWorkbookDiagnostics(after));
+    setActiveCell("A1");
+    setSelection("A1");
+    setActiveResource("sales");
+  }, [workbook]);
+
+  const activateSheet = useCallback((sheetId: string) => {
+    const after = applySpreadsheetOperations(workbook, [{ type: "activate-sheet", sheetId }]);
+    setWorkbook(after);
+    setActiveCell("A1");
+    setSelection("A1");
+    setActiveResource("sales");
+  }, [workbook]);
+
+  const renameSheet = useCallback((sheetId: string, name: string) => {
+    const cleanName = name.trim();
+    if (!cleanName) return;
+    const operation = { type: "rename-sheet" as const, sheetId, name: cleanName };
+    const before = workbook;
+    const after = applySpreadsheetOperations(before, [operation]);
+    const transaction = createTransaction(`Renamed sheet to ${cleanName}`, [operation]);
+    sourceUpdateOrigin.current = "visual";
+    setWorkbook(after);
+    setSource(serializeSpreadsheetSource(after));
+    setHistory((entries) => [...entries, { transaction, before, after }]);
+    setRedoStack([]);
+    setDiagnostics(getWorkbookDiagnostics(after));
+  }, [workbook]);
+
+  const deleteSheet = useCallback((sheetId: string) => {
+    if (workbook.sheets.length === 1) return;
+    const deletedName = workbook.sheets.find((sheet) => sheet.id === sheetId)?.name ?? sheetId;
+    const operation = { type: "delete-sheet" as const, sheetId };
+    const before = workbook;
+    const after = applySpreadsheetOperations(before, [operation]);
+    const transaction = createTransaction(`Deleted sheet ${deletedName}`, [operation]);
+    sourceUpdateOrigin.current = "visual";
+    setWorkbook(after);
+    setSource(serializeSpreadsheetSource(after));
+    setHistory((entries) => [...entries, { transaction, before, after }]);
+    setRedoStack([]);
+    setDiagnostics(getWorkbookDiagnostics(after));
+    setActiveCell("A1");
+    setSelection("A1");
+  }, [workbook]);
+
+  const resetWorkspace = useCallback(() => {
+    if (typeof window !== "undefined") clearWorkspaceSnapshot(window.localStorage);
+    sourceUpdateOrigin.current = "visual";
+    setWorkbook(initialWorkbook);
+    setSource(SAMPLE_SHEET_SOURCE);
+    setDiagnostics([]);
+    setHistory([]);
+    setRedoStack([]);
+    setActiveCell("C17");
+    setSelection("A2:F15");
+    setAutosaveState("saving");
+    setLastSavedAt(null);
+  }, []);
+
   useEffect(() => {
     if (sourceUpdateOrigin.current !== "source") return;
     const timer = window.setTimeout(() => {
@@ -284,6 +373,9 @@ export function useOfficeWorkspace() {
       if (!result.workbook) return;
 
       setWorkbook((before) => {
+        if (result.workbook!.sheets.some((sheet) => sheet.id === before.activeSheetId)) {
+          result.workbook!.activeSheetId = before.activeSheetId;
+        }
         const transaction = createTransaction("Updated KDL source", [], { type: "user" });
         setHistory((entries) => [
           ...entries,
@@ -295,6 +387,21 @@ export function useOfficeWorkspace() {
     }, 260);
     return () => window.clearTimeout(timer);
   }, [source]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setAutosaveState("saving");
+    const timer = window.setTimeout(() => {
+      try {
+        const savedAt = saveWorkspaceSnapshot(window.localStorage, workbook);
+        setLastSavedAt(savedAt);
+        setAutosaveState("saved");
+      } catch {
+        setAutosaveState("error");
+      }
+    }, 220);
+    return () => window.clearTimeout(timer);
+  }, [workbook]);
 
   const undo = useCallback(() => {
     setHistory((entries) => {
@@ -362,12 +469,19 @@ export function useOfficeWorkspace() {
     explorerOpen,
     paletteOpen,
     activeResource,
+    autosaveState,
+    lastSavedAt,
     applyCellEdit,
     applyCellStyle,
     applyColumnWidth,
     applyRowHeight,
     applySheetStructure,
     applyFormulaFill,
+    addSheet,
+    activateSheet,
+    renameSheet,
+    deleteSheet,
+    resetWorkspace,
     editSource,
     undo,
     redo,

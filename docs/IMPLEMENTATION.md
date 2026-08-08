@@ -101,3 +101,18 @@ selected range → +R / −R / +C / −C → count-aware structure transaction
 ```
 
 `fill-formula` translates row and column references from the active source cell across the range, preserves `$` absolute markers and quoted A1-like text, retains each destination style, serializes every generated formula to KDL, and is reverted by one Undo. Row and column controls use the selected span as their operation count, so multiple rows or columns move in a single transaction.
+
+## Phase 1 multi-sheet and recovery slice
+
+Sheet tabs and Explorer rows are now derived from the same Workbook IR. `add-sheet`, `activate-sheet`, `rename-sheet`, and `delete-sheet` operations enforce a non-empty workbook and stable IDs. Create, rename, and delete actions are semantic transactions; deleting a sheet is recoverable with one Undo. KDL emits each ID as `sheet "name" id="sheet-id"`, so source round-trips no longer replace sheet identity.
+
+The browser prototype also has a versioned recovery layer:
+
+```text
+valid Workbook IR → canonical KDL snapshot → localStorage
+page reload → version check → KDL parse + diagnostics → restored Workbook IR
+```
+
+Corrupt, unsupported-version, or invalid-KDL snapshots are ignored instead of entering runtime state. The active sheet ID is restored separately. This is a browser safety net for the current prototype, not the specification's final persistence layer; filesystem-backed workspace open/create/save/load through Tauri remains pending.
+
+The README demo is generated from the Playwright interaction flow at 1280×720 and encoded as a 14-second H.264 MP4. The recorded path covers sheet creation, inline rename, value/formula entry, autosave, full-page reload recovery, sheet switching, delete, and Undo.

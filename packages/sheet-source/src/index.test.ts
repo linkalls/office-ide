@@ -48,6 +48,15 @@ describe("spreadsheet source", () => {
     expect(second?.sheets[0]?.rowHeights).toEqual(first?.sheets[0]?.rowHeights);
   });
 
+  test("preserves stable sheet ids across KDL serialization", () => {
+    const first = parseSpreadsheetSource(SOURCE).workbook!;
+    first.sheets[0]!.id = "sheet-sales-stable";
+    const serialized = serializeSpreadsheetSource(first);
+    const second = parseSpreadsheetSource(serialized).workbook;
+    expect(serialized).toContain('sheet "売上" id="sheet-sales-stable"');
+    expect(second?.sheets[0]?.id).toBe("sheet-sales-stable");
+  });
+
   test("keeps the last valid IR possible by reporting syntax errors", () => {
     const result = parseSpreadsheetSource(`${SOURCE}\n}`);
     expect(result.workbook).toBeNull();

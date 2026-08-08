@@ -163,4 +163,48 @@ describe("spreadsheet operations", () => {
 
     expect(changed.sheets[0]?.cells.F6?.value).toBe("moved");
   });
+
+  test("creates, activates, renames, and deletes sheets immutably", () => {
+    const workbook = createEmptyWorkbook("Book", "売上");
+    const created = applySpreadsheetOperations(workbook, [{
+      type: "add-sheet",
+      sheetId: "sheet-summary",
+      name: "集計",
+    }]);
+    expect(created.sheets.map((sheet) => sheet.name)).toEqual(["売上", "集計"]);
+    expect(created.activeSheetId).toBe("sheet-summary");
+
+    const renamed = applySpreadsheetOperations(created, [{
+      type: "rename-sheet",
+      sheetId: "sheet-summary",
+      name: "月次集計",
+    }]);
+    expect(renamed.sheets[1]?.name).toBe("月次集計");
+
+    const activated = applySpreadsheetOperations(renamed, [{
+      type: "activate-sheet",
+      sheetId: "sheet-1",
+    }]);
+    expect(activated.activeSheetId).toBe("sheet-1");
+
+    const deleted = applySpreadsheetOperations(activated, [{
+      type: "delete-sheet",
+      sheetId: "sheet-summary",
+    }]);
+    expect(deleted.sheets).toHaveLength(1);
+    expect(workbook.sheets).toHaveLength(1);
+  });
+
+  test("protects workbook sheet invariants", () => {
+    const workbook = createEmptyWorkbook();
+    expect(() => applySpreadsheetOperations(workbook, [{
+      type: "delete-sheet",
+      sheetId: "sheet-1",
+    }])).toThrow("at least one sheet");
+    expect(() => applySpreadsheetOperations(workbook, [{
+      type: "rename-sheet",
+      sheetId: "sheet-1",
+      name: "   ",
+    }])).toThrow("cannot be empty");
+  });
 });

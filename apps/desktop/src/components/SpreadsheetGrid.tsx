@@ -5,6 +5,7 @@ import {
   type FormulaValue,
 } from "@office-ide/formula";
 import type { OfficeWorkspace } from "../state/useOfficeWorkspace";
+import type { SpreadsheetSheet } from "@office-ide/spreadsheet-ir";
 
 interface Props {
   workspace: OfficeWorkspace;
@@ -76,6 +77,83 @@ function CellInput({ address, rawValue, displayValue, style, onCommit, onSelect 
         }
       }}
     />
+  );
+}
+
+interface SheetTabProps {
+  sheet: SpreadsheetSheet;
+  active: boolean;
+  canDelete: boolean;
+  onActivate: () => void;
+  onRename: (name: string) => void;
+  onDelete: () => void;
+}
+
+function SheetTab({ sheet, active, canDelete, onActivate, onRename, onDelete }: SheetTabProps) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(sheet.name);
+  const cancelRenameRef = useRef(false);
+
+  useEffect(() => setDraft(sheet.name), [sheet.name]);
+
+  const commitRename = () => {
+    if (cancelRenameRef.current) {
+      cancelRenameRef.current = false;
+      setDraft(sheet.name);
+      setEditing(false);
+      return;
+    }
+    const cleanName = draft.trim();
+    setEditing(false);
+    if (cleanName && cleanName !== sheet.name) onRename(cleanName);
+    else setDraft(sheet.name);
+  };
+
+  return (
+    <div className="sheet-tab-wrap" data-active={active}>
+      {editing ? (
+        <input
+          autoFocus
+          aria-label={`Rename sheet ${sheet.name}`}
+          className="sheet-tab-input"
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={commitRename}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.currentTarget.blur();
+            if (event.key === "Escape") {
+              cancelRenameRef.current = true;
+              event.currentTarget.blur();
+            }
+          }}
+        />
+      ) : (
+        <button
+          className="sheet-tab"
+          type="button"
+          data-active={active}
+          aria-label={`Open sheet ${sheet.name}`}
+          onClick={onActivate}
+          onDoubleClick={() => {
+            cancelRenameRef.current = false;
+            setEditing(true);
+          }}
+        >
+          {sheet.name}
+        </button>
+      )}
+      {canDelete ? (
+        <button
+          className="sheet-tab-delete"
+          type="button"
+          aria-label={`Delete sheet ${sheet.name}`}
+          title="Delete sheet (Undo available)"
+          onClick={onDelete}
+        >
+          ×
+        </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -182,8 +260,25 @@ export function SpreadsheetGrid({ workspace }: Props) {
         </tbody>
       </table>
       <div className="sheet-tabs">
-        <button className="sheet-tab active" type="button">売上</button>
-        <button className="sheet-tab-add" type="button">＋</button>
+        {workspace.workbook.sheets.map((sheet) => (
+          <SheetTab
+            key={sheet.id}
+            sheet={sheet}
+            active={workspace.activeSheet.id === sheet.id}
+            canDelete={workspace.workbook.sheets.length > 1}
+            onActivate={() => workspace.activateSheet(sheet.id)}
+            onRename={(name) => workspace.renameSheet(sheet.id, name)}
+            onDelete={() => workspace.deleteSheet(sheet.id)}
+          />
+        ))}
+        <button
+          className="sheet-tab-add"
+          type="button"
+          aria-label="Add sheet"
+          onClick={workspace.addSheet}
+        >
+          ＋
+        </button>
         <span className="sheet-tab-spacer" />
         <span className="zoom-label">100%</span>
       </div>
