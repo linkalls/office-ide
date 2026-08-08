@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Office IDE">
+  <defs>
+    <linearGradient id="background" x1="76" y1="52" x2="432" y2="460" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#193f35"/>
+      <stop offset="1" stop-color="#0c201c"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="146" y1="122" x2="368" y2="392" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8ce8bb"/>
+      <stop offset="1" stop-color="#3ebd82"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#background)"/>
+  <rect x="88" y="88" width="336" height="336" rx="58" fill="#102b25" stroke="#78dbaa" stroke-width="14"/>
+
+  <!-- A compact spreadsheet grid, kept bold enough to remain readable at dock size. -->
+  <path d="M106 184h300M106 280h300M202 106v300M298 106v300" stroke="#4e8f75" stroke-width="12"/>
+  <rect x="214" y="196" width="72" height="72" rx="16" fill="url(#accent)"/>
+
+  <!-- The command chevron ties the spreadsheet surface to an IDE/agent workflow. -->
+  <path d="m236 218 19 14-19 14M261 250h18" fill="none" stroke="#0c201c" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Small execution sparkle: proposals become visible, reviewable changes. -->
+  <path d="M369 110c5 25 19 39 44 44-25 5-39 19-44 44-5-25-19-39-44-44 25-5 39-19 44-44Z" fill="#d8ffe9"/>
+</svg>

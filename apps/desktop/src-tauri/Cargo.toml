@@ -17,3 +17,5 @@ office-ipc = { path = "../../../crates/ipc" }
 serde.workspace = true
 serde_json.workspace = true
 tauri = { version = "2", features = [] }
+thiserror.workspace = true
+tokio = { version = "1", features = ["io-util", "process", "sync", "time"] }

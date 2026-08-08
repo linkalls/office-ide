@@ -344,6 +344,10 @@ textarea:focus-visible {
 .agent-terminal p { margin: 0 0 7px; }
 .terminal-heading { display: flex; align-items: center; gap: 7px; color: #60a5fa; font-family: Inter, sans-serif; font-size: 12px; font-weight: 700; margin-bottom: 13px; }
 .terminal-heading small { margin-left: auto; display: flex; align-items: center; gap: 4px; padding: 3px 6px; border: 1px solid #29553f; border-radius: 999px; color: #79d7a3; font-size: 8px; font-weight: 600; }
+.terminal-heading small[data-phase="error"],
+.terminal-heading small[data-phase="exited"] { border-color: #6c3036; color: #ff8e96; }
+.terminal-heading small[data-phase="starting"],
+.terminal-heading small[data-phase="running"] { border-color: #765827; color: #f5bb67; }
 .agent-line { display: flex; align-items: flex-start; gap: 3px; color: #b7c2cf; }
 .agent-line svg { flex: 0 0 auto; margin-top: 2px; color: #6b788b; }
 .agent-line.muted { color: #788699; }
@@ -360,6 +364,19 @@ textarea:focus-visible {
 .agent-message[data-role="system"][data-state="reverted"] strong { color: #f5bb67; }
 .agent-message[data-role="system"][data-state="re-applied"] strong { color: #7dbbff; }
 .agent-message p { margin: 0; color: #aebbc9; }
+.agent-activity { margin: 7px 0; padding: 8px 9px; border-left: 2px solid #40536b; background: #0e1823; }
+.agent-activity[data-status="running"] { border-color: var(--amber); }
+.agent-activity[data-status="error"] { border-color: var(--red); }
+.agent-activity[data-kind="agentMessage"] { border-color: var(--accent); }
+.agent-activity strong { display: block; color: #b9c7d7; font-size: 9px; }
+.agent-activity p { margin: 4px 0; white-space: pre-wrap; color: #d4dde8; }
+.agent-activity > span { color: var(--subtle); font-size: 8px; text-transform: uppercase; }
+.codex-approval { margin: 12px 0; padding: 10px; border: 1px solid #765827; border-radius: 6px; background: #281f12; }
+.codex-approval > strong { display: flex; align-items: center; gap: 6px; color: #f5bb67; }
+.codex-approval > code { display: block; margin-top: 6px; color: #d7be90; font-size: 8px; }
+.codex-approval > p { margin: 7px 0; color: #b8aa91; }
+.spin { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .agent-transaction-state { display: block; margin-top: 7px; padding-top: 6px; border-top: 1px solid rgba(121,215,163,.18); color: #79d7a3; font: 700 8px/1.4 Inter, sans-serif; letter-spacing: .02em; }
 .agent-message[data-state="reverted"] .agent-transaction-state { border-color: rgba(245,187,103,.2); color: #f5bb67; }
 .agent-message[data-state="re-applied"] .agent-transaction-state { border-color: rgba(125,187,255,.2); color: #7dbbff; }
@@ -377,12 +394,15 @@ textarea:focus-visible {
 .proposal-actions button { height: 28px; display: flex; align-items: center; justify-content: center; gap: 5px; border-radius: 4px; cursor: pointer; font-size: 9px; }
 .proposal-apply { flex: 1; border: 1px solid #2f81f7; color: white; background: #236bc2; }
 .proposal-apply:hover { background: #2f81f7; }
+.proposal-session { border: 1px solid #48745d; color: #a8e0bd; background: #183125; }
+.proposal-session:hover { background: #214733; }
 .proposal-dismiss { border: 1px solid #344357; color: #8f9cad; background: transparent; }
 .proposal-dismiss:hover { color: white; background: #1a2736; }
 .agent-composer { position: relative; margin: 8px 10px 10px; border: 1px solid #31445b; border-radius: 6px; background: #111c29; }
 .composer-label { height: 25px; display: flex; align-items: center; gap: 6px; padding: 0 9px; color: #718096; font-size: 9px; }
 .agent-composer textarea { width: 100%; height: 66px; resize: none; border: 0; padding: 8px 40px 8px 10px; outline: 0; color: #dbe3ec; background: transparent; font-size: 11px; }
 .agent-composer button { position: absolute; right: 8px; bottom: 8px; width: 27px; height: 27px; display: grid; place-items: center; border: 0; border-radius: 4px; background: var(--accent); color: white; cursor: pointer; }
+.agent-composer button:disabled { cursor: wait; opacity: .6; }
 
 .status-bar { display: flex; align-items: center; gap: 14px; padding: 0 10px; background: #0f4a86; color: #dcecff; font-size: 9px; user-select: none; }
 .status-bar span { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
