@@ -114,7 +114,16 @@ bun run tauri dev
 bun run typecheck
 bun test
 bun run build
+bun run demo:record
 ```
+
+一括完了ゲート:
+
+```bash
+bun run qa:complete
+```
+
+`demo:record`はPlaywrightで実際のUIを操作して動画を生成する必須検証であり、README更新時だけの任意作業ではない。コード変更を完了扱いにする前に毎回実行する。UI変更がない場合も再収録とQAを通し、意図しない表示・操作・recoveryの退行がないことを確認する。UIや操作フローが変わった場合は、収録シナリオとassertionを新しい挙動へ更新し、生成されたMP4とposter画像を一緒にコミットする。
 
 直近の検証結果:
 
@@ -241,7 +250,7 @@ bun run tauri dev
 - version付きbrowser autosave/recoveryはあるが、filesystem persistenceとworkspace pickerは未実装。
 - UIはdark themeのみ。
 - Agent plannerは平均単価/税込売上/売上しきい値強調/地域別集計sheetの4レシピに限定した決定的rule engineで、LLMや実CLIではない。PTY Agentと承認境界の設計は`docs/AGENT-RUNTIME.md`に固定済み。
-- unit testsはformula/sheet-source/operations/persistence/agent-planner/history/Codex runtime reducerの47件。`bun run codex:smoke --turn`は実CLIのread-only ephemeral turnを検証する。Playwright smoke QAは手動実行で、README demoは`bun run demo:record`で再生成できる。Tauri window内のapproval/exit visual integration suiteは未整備。
+- unit testsはformula/sheet-source/operations/persistence/agent-planner/history/Codex runtime reducerの47件。`bun run codex:smoke --turn`は実CLIのread-only ephemeral turnを検証する。Playwright smoke QAとREADME demo収録は`bun run demo:record`を毎回の必須完了ゲートとして実行する。Tauri window内のapproval/exit visual integration suiteは未整備。
 
 ## 9. Codexへの作業ルール
 
@@ -249,5 +258,7 @@ bun run tauri dev
 - 1回の作業では上記「次に実装する順序」の1項目を完了可能な範囲へ分割する。
 - UIだけ追加して完了扱いにしない。Implementation、tests、error state、keyboard、persistence、Undoの該当項目を確認する。
 - 既存の双方向vertical sliceを壊さない。
-- Bun scriptsを使い、完了時にtypecheck、tests、buildを実行する。
+- Bun scriptsを使い、完了時に`bun run qa:complete`を実行する。これはtypecheck、tests、buildに加えてPlaywrightによる実UI操作と動画生成を含む。動画生成を省略して完了扱いにしない。
+- Playwright収録は対象フローを実際に操作し、console warning/error、framework overlay、viewport overflow、主要state transition、reload recovery、生成MP4の再デコードを検証する。UI変更で既存シナリオが古くなった場合は`scripts/record-agent-demo.ts`の操作とassertionも同じ変更内で更新する。
+- UIや操作フローが変わった場合は`docs/media/office-ide-agent-demo.mp4`と`docs/images/office-ide-agent-*.png`を再生成してコミットする。非UI変更でも`bun run demo:record`を実行し、再生成物に意図しない差分がないことを確認する。
 - 実装範囲と未達をこのファイルへ追記し、コミット単位で現在地を更新する。
