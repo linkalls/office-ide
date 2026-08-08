@@ -32,6 +32,14 @@ export interface CodexServerRequest {
   params: unknown;
 }
 
+// Kept equal to Codex app-server 0.147.0's generated command/file approval
+// decision literals. Rich amendment objects stay out of this first UI slice.
+export type CodexApprovalDecision =
+  | "accept"
+  | "acceptForSession"
+  | "decline"
+  | "cancel";
+
 export interface CodexRuntimeState {
   phase: CodexRuntimePhase;
   statusMessage: string;
@@ -50,8 +58,11 @@ export interface CodexBackendEvent {
 
 export type CodexRuntimeAction =
   | { type: "backend"; event: CodexBackendEvent }
+  | { type: "hostRestored" }
   | { type: "threadStarted"; threadId: string }
   | { type: "turnStarted"; turnId: string }
+  | { type: "requestAnswered"; id: string | number }
+  | { type: "stopped" }
   | { type: "failure"; message: string };
 
 export function createCodexRuntimeState(isDesktop: boolean): CodexRuntimeState {
@@ -174,6 +185,7 @@ function reduceNotification(
       ...state,
       phase: turnStatus === "failed" ? "error" : "ready",
       statusMessage: turnStatus === "failed" ? "Codex turn failed" : "Codex app-server ready",
+      turnId: null,
       activities: upsertActivity(state.activities, {
         id: activityId("turn", turnId),
         kind: "turn",
@@ -262,6 +274,13 @@ export function codexRuntimeReducer(
   state: CodexRuntimeState,
   action: CodexRuntimeAction,
 ): CodexRuntimeState {
+  if (action.type === "hostRestored") {
+    return {
+      ...state,
+      phase: "ready",
+      statusMessage: "Reattached to the Rust-owned Codex app-server",
+    };
+  }
   if (action.type === "threadStarted") {
     return { ...state, threadId: action.threadId };
   }
@@ -273,6 +292,27 @@ export function codexRuntimeReducer(
       turnId: action.turnId,
     };
   }
+  if (action.type === "requestAnswered") {
+    return {
+      ...state,
+      pendingRequests: state.pendingRequests.filter((request) => request.id !== action.id),
+      activities: state.activities.map((activity) => (
+        activity.id === activityId("approval", String(action.id))
+          ? { ...activity, status: "completed" }
+          : activity
+      )),
+    };
+  }
+  if (action.type === "stopped") {
+    return {
+      ...state,
+      phase: "disconnected",
+      statusMessage: "Codex app-server stopped",
+      threadId: null,
+      turnId: null,
+      pendingRequests: [],
+    };
+  }
   if (action.type === "failure") {
     return { ...state, phase: "error", statusMessage: action.message };
   }
@@ -280,12 +320,19 @@ export function codexRuntimeReducer(
   const event = action.event;
   if (event.kind === "phase") {
     const phase = event.phase ?? state.phase;
+    const disconnected = phase === "exited" || phase === "disconnected";
     return {
       ...state,
       phase,
       statusMessage: event.message ?? state.statusMessage,
-      threadId: phase === "exited" || phase === "disconnected" ? null : state.threadId,
-      turnId: phase === "exited" || phase === "disconnected" ? null : state.turnId,
+      threadId: disconnected ? null : state.threadId,
+      turnId: disconnected ? null : state.turnId,
+      pendingRequests: disconnected ? [] : state.pendingRequests,
+      activities: disconnected
+        ? state.activities.map((activity) => activity.status === "pending"
+          ? { ...activity, status: "error" }
+          : activity)
+        : state.activities,
     };
   }
   if (event.kind === "notification") {
@@ -301,16 +348,21 @@ export function codexRuntimeReducer(
       method,
       params: request?.params,
     };
+    const requestExists = state.pendingRequests.some((pending) => pending.id === id);
     return {
       ...state,
-      pendingRequests: [...state.pendingRequests, serverRequest],
-      activities: [...state.activities, {
+      // Replayed/delivered-twice protocol messages update the existing request
+      // instead of creating two approval buttons for one JSON-RPC id.
+      pendingRequests: requestExists
+        ? state.pendingRequests.map((pending) => pending.id === id ? serverRequest : pending)
+        : [...state.pendingRequests, serverRequest],
+      activities: upsertActivity(state.activities, {
         id: activityId("approval", String(id)),
         kind: "approval",
         title: method,
         detail: "Codex app-server requested a decision",
         status: "pending",
-      }],
+      }),
     };
   }
 

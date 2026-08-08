@@ -1,6 +1,6 @@
 mod codex_host;
 
-use codex_host::CodexHost;
+use codex_host::{CodexHost, CodexHostStatus};
 use office_core::WorkspaceInfo;
 use office_ipc::OpenWorkspaceRequest;
 use serde_json::Value;
@@ -33,6 +33,16 @@ async fn codex_start_thread(host: State<'_, CodexHost>, cwd: String) -> Result<V
 }
 
 #[tauri::command]
+async fn codex_resume_thread(
+    host: State<'_, CodexHost>,
+    thread_id: String,
+) -> Result<Value, String> {
+    host.resume_thread(thread_id)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 async fn codex_start_turn(
     host: State<'_, CodexHost>,
     thread_id: String,
@@ -40,6 +50,17 @@ async fn codex_start_turn(
     cwd: String,
 ) -> Result<Value, String> {
     host.start_turn(thread_id, prompt, cwd)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+async fn codex_interrupt_turn(
+    host: State<'_, CodexHost>,
+    thread_id: String,
+    turn_id: String,
+) -> Result<(), String> {
+    host.interrupt_turn(thread_id, turn_id)
         .await
         .map_err(|error| error.to_string())
 }
@@ -56,9 +77,14 @@ async fn codex_respond_to_server_request(
 }
 
 #[tauri::command]
-async fn codex_shutdown(host: State<'_, CodexHost>) -> Result<(), String> {
-    host.shutdown().await;
+async fn codex_shutdown(app: AppHandle, host: State<'_, CodexHost>) -> Result<(), String> {
+    host.stop(&app).await;
     Ok(())
+}
+
+#[tauri::command]
+async fn codex_status(host: State<'_, CodexHost>) -> CodexHostStatus {
+    host.status().await
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -70,9 +96,12 @@ pub fn run() {
             platform_summary,
             codex_start,
             codex_start_thread,
+            codex_resume_thread,
             codex_start_turn,
+            codex_interrupt_turn,
             codex_respond_to_server_request,
             codex_shutdown,
+            codex_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Office IDE");

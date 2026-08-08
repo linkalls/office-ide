@@ -6,10 +6,16 @@ import {
   createCodexRuntimeState,
   readThreadId,
   readTurnId,
+  type CodexApprovalDecision,
   type CodexBackendEvent,
 } from "./codexRuntime";
 
 const CODEX_EVENT_NAME = "codex://event";
+
+interface CodexHostStatus {
+  running: boolean;
+  pendingResponseCount: number;
+}
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -24,10 +30,15 @@ export function useCodexRuntime() {
   );
   const connectPromise = useRef<Promise<void> | null>(null);
   const threadIdRef = useRef<string | null>(null);
+  const turnIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     threadIdRef.current = state.threadId;
   }, [state.threadId]);
+
+  useEffect(() => {
+    turnIdRef.current = state.turnId;
+  }, [state.turnId]);
 
   useEffect(() => {
     if (!desktop) return undefined;
@@ -47,13 +58,19 @@ export function useCodexRuntime() {
     };
   }, [desktop]);
 
-  const connect = useCallback(async () => {
+  useEffect(() => {
     if (!desktop) return;
-    if (state.phase === "ready" || state.phase === "running") return;
-    // A failed turn does not imply that the app-server process or thread died.
-    if (state.phase === "error" && threadIdRef.current) return;
-    if (connectPromise.current) return connectPromise.current;
+    // A WebView reload must query the Rust owner instead of assuming the old
+    // process disappeared. No PID, environment, or account data crosses here.
+    void invoke<CodexHostStatus>("codex_status")
+      .then((status) => {
+        if (status.running) dispatch({ type: "hostRestored" });
+      })
+      .catch(() => undefined);
+  }, [desktop]);
 
+  const startHost = useCallback(async () => {
+    if (connectPromise.current) return connectPromise.current;
     const pending = invoke("codex_start")
       .then(() => undefined)
       .catch((error: unknown) => {
@@ -65,7 +82,15 @@ export function useCodexRuntime() {
       });
     connectPromise.current = pending;
     return pending;
-  }, [desktop, state.phase]);
+  }, []);
+
+  const connect = useCallback(async () => {
+    if (!desktop) return;
+    if (state.phase === "ready" || state.phase === "running") return;
+    // A failed turn does not imply that the app-server process or thread died.
+    if (state.phase === "error" && threadIdRef.current) return;
+    return startHost();
+  }, [desktop, startHost, state.phase]);
 
   const sendPrompt = useCallback(async (prompt: string, cwd: string) => {
     if (!desktop) throw new Error("Codex app-server is available only in the Tauri desktop app");
@@ -96,14 +121,56 @@ export function useCodexRuntime() {
 
   const answerRequest = useCallback(async (
     id: string | number,
-    decision: "accept" | "acceptForSession" | "decline" | "cancel",
+    decision: CodexApprovalDecision,
   ) => {
     if (!desktop) return;
-    await invoke("codex_respond_to_server_request", {
-      id,
-      result: { decision },
-    });
+    try {
+      await invoke("codex_respond_to_server_request", {
+        id,
+        result: { decision },
+      });
+      // A successful JSON-RPC write resolves this UI control exactly once. The
+      // app-server does not owe us a custom "serverRequest/resolved" event.
+      dispatch({ type: "requestAnswered", id });
+    } catch (error) {
+      dispatch({ type: "failure", message: errorMessage(error) });
+      throw error;
+    }
   }, [desktop]);
+
+  const resumeThread = useCallback(async (threadId: string) => {
+    if (!desktop) return;
+    await connect();
+    const response = await invoke<unknown>("codex_resume_thread", { threadId });
+    const resumedThreadId = readThreadId(response);
+    if (!resumedThreadId) throw new Error("Codex app-server returned no resumed thread id");
+    threadIdRef.current = resumedThreadId;
+    dispatch({ type: "threadStarted", threadId: resumedThreadId });
+  }, [connect, desktop]);
+
+  const cancelTurn = useCallback(async () => {
+    const threadId = threadIdRef.current;
+    const turnId = turnIdRef.current;
+    if (!desktop || !threadId || !turnId) return;
+    await invoke("codex_interrupt_turn", { threadId, turnId });
+  }, [desktop]);
+
+  const disconnect = useCallback(async () => {
+    if (!desktop) return;
+    await invoke("codex_shutdown");
+    dispatch({ type: "stopped" });
+  }, [desktop]);
+
+  const reconnect = useCallback(async () => {
+    if (!desktop) return;
+    try {
+      await invoke("codex_shutdown");
+    } catch {
+      // A dead/missing process is already in the desired pre-reconnect state.
+    }
+    dispatch({ type: "stopped" });
+    await startHost();
+  }, [desktop, startHost]);
 
   return {
     ...state,
@@ -111,6 +178,10 @@ export function useCodexRuntime() {
     connect,
     sendPrompt,
     answerRequest,
+    resumeThread,
+    cancelTurn,
+    disconnect,
+    reconnect,
   };
 }
 

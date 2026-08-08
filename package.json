@@ -12,6 +12,7 @@
     "dev": "bun --cwd apps/desktop dev",
     "build": "bun --cwd apps/desktop build",
     "codex:schema": "bun scripts/generate-codex-schema.ts",
+    "codex:smoke": "bun scripts/smoke-codex-app-server.ts",
     "demo:record": "bun scripts/record-agent-demo.ts",
     "test": "bun test",
     "typecheck": "bun --cwd apps/desktop typecheck",

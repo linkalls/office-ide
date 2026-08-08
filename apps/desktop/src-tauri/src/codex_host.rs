@@ -30,6 +30,18 @@ pub struct CodexRuntimeEvent {
     pub payload: Option<Value>,
 }
 
+/// A deliberately small process snapshot for WebView reload and reconnect logic.
+///
+/// The host never exposes child PIDs, environment variables, account details, or
+/// credentials. The frontend only needs to know whether it can reuse the owned
+/// process and whether requests are still awaiting a response.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexHostStatus {
+    pub running: bool,
+    pub pending_response_count: usize,
+}
+
 impl CodexRuntimeEvent {
     fn phase(phase: &'static str, message: impl Into<String>) -> Self {
         Self {
@@ -74,6 +86,8 @@ pub enum CodexHostError {
     NotRunning,
     #[error("Codex app-server is already running")]
     AlreadyRunning,
+    #[error("Codex is installed but not signed in; run `codex` and sign in with ChatGPT")]
+    NotAuthenticated,
     #[error("failed to start `codex app-server`: {0}")]
     Spawn(#[source] std::io::Error),
     #[error("failed to write to Codex app-server: {0}")]
@@ -191,6 +205,28 @@ impl CodexHost {
 
         // The official lifecycle requires the initialize response before this notification.
         self.notify("initialized", json!({})).await?;
+
+        // Authentication is queried through the official app-server surface. We
+        // intentionally inspect only presence/absence and never forward the account
+        // object (which may contain an email address) into the WebView.
+        let account = self
+            .request("account/read", json!({ "refreshToken": false }))
+            .await;
+        let account = match account {
+            Ok(value) => value,
+            Err(error) => {
+                emit(&app, CodexRuntimeEvent::phase("error", error.to_string()));
+                self.shutdown().await;
+                return Err(error);
+            }
+        };
+        if !account_is_authenticated(&account) {
+            let error = CodexHostError::NotAuthenticated;
+            emit(&app, CodexRuntimeEvent::phase("error", error.to_string()));
+            self.shutdown().await;
+            return Err(error);
+        }
+
         emit(
             &app,
             CodexRuntimeEvent::phase("ready", "Codex app-server ready"),
@@ -203,9 +239,19 @@ impl CodexHost {
             "thread/start",
             json!({
                 "cwd": cwd,
-                "approvalPolicy": "unlessTrusted",
-                "sandbox": "workspaceWrite",
+                "approvalPolicy": "on-request",
+                "sandbox": "workspace-write",
                 "serviceName": "office_ide"
+            }),
+        )
+        .await
+    }
+
+    pub async fn resume_thread(&self, thread_id: String) -> Result<Value, CodexHostError> {
+        self.request(
+            "thread/resume",
+            json!({
+                "threadId": thread_id
             }),
         )
         .await
@@ -223,15 +269,33 @@ impl CodexHost {
                 "threadId": thread_id,
                 "input": [{ "type": "text", "text": prompt }],
                 "cwd": cwd,
-                "approvalPolicy": "unlessTrusted",
+                "approvalPolicy": "on-request",
                 "sandboxPolicy": {
                     "type": "workspaceWrite",
                     "writableRoots": [cwd],
-                    "networkAccess": false
+                    "networkAccess": false,
+                    "excludeTmpdirEnvVar": false,
+                    "excludeSlashTmp": false
                 }
             }),
         )
         .await
+    }
+
+    pub async fn interrupt_turn(
+        &self,
+        thread_id: String,
+        turn_id: String,
+    ) -> Result<(), CodexHostError> {
+        self.request(
+            "turn/interrupt",
+            json!({
+                "threadId": thread_id,
+                "turnId": turn_id
+            }),
+        )
+        .await?;
+        Ok(())
     }
 
     pub async fn respond_to_server_request(
@@ -251,6 +315,22 @@ impl CodexHost {
         }
         for (_, sender) in shared.pending.drain() {
             let _ = sender.send(Err("Codex app-server stopped".to_owned()));
+        }
+    }
+
+    pub async fn stop(&self, app: &AppHandle) {
+        self.shutdown().await;
+        emit(
+            app,
+            CodexRuntimeEvent::phase("disconnected", "Codex app-server stopped"),
+        );
+    }
+
+    pub async fn status(&self) -> CodexHostStatus {
+        let shared = self.shared.lock().await;
+        CodexHostStatus {
+            running: shared.process.is_some(),
+            pending_response_count: shared.pending.len(),
         }
     }
 
@@ -346,31 +426,63 @@ impl CodexHost {
     }
 }
 
-async fn route_message(app: &AppHandle, shared: &Arc<Mutex<SharedState>>, message: Value) {
+#[derive(Debug)]
+enum IncomingMessage {
+    Response {
+        id: u64,
+        response: Result<Value, String>,
+    },
+    ServerRequest(Value),
+    Notification(Value),
+}
+
+fn classify_message(message: Value) -> IncomingMessage {
     if let Some(id) = message.get("id").and_then(Value::as_u64) {
-        // A response has result/error but no method. A message with method is a
-        // server-initiated request (for example an approval) and must reach the UI.
+        // Client responses have an id but no method. A method plus id is a
+        // server-initiated request and must be rendered by the frontend.
         if message.get("method").is_none() {
-            if let Some(sender) = shared.lock().await.pending.remove(&id) {
-                let response = if let Some(error) = message.get("error") {
-                    Err(error
-                        .get("message")
-                        .and_then(Value::as_str)
-                        .unwrap_or("Unknown Codex app-server error")
-                        .to_owned())
-                } else {
-                    Ok(message.get("result").cloned().unwrap_or(Value::Null))
-                };
-                let _ = sender.send(response);
-            }
-            return;
+            let response = if let Some(error) = message.get("error") {
+                Err(error
+                    .get("message")
+                    .and_then(Value::as_str)
+                    .unwrap_or("Unknown Codex app-server error")
+                    .to_owned())
+            } else {
+                Ok(message.get("result").cloned().unwrap_or(Value::Null))
+            };
+            return IncomingMessage::Response { id, response };
         }
     }
 
     if message.get("id").is_some() && message.get("method").is_some() {
-        emit(app, CodexRuntimeEvent::server_request(message));
+        IncomingMessage::ServerRequest(message)
     } else {
-        emit(app, CodexRuntimeEvent::notification(message));
+        IncomingMessage::Notification(message)
+    }
+}
+
+fn account_is_authenticated(account: &Value) -> bool {
+    let requires_openai_auth = account
+        .get("requiresOpenaiAuth")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let has_account = account.get("account").is_some_and(|value| !value.is_null());
+    !requires_openai_auth || has_account
+}
+
+async fn route_message(app: &AppHandle, shared: &Arc<Mutex<SharedState>>, message: Value) {
+    match classify_message(message) {
+        IncomingMessage::Response { id, response } => {
+            if let Some(sender) = shared.lock().await.pending.remove(&id) {
+                let _ = sender.send(response);
+            }
+        }
+        IncomingMessage::ServerRequest(message) => {
+            emit(app, CodexRuntimeEvent::server_request(message));
+        }
+        IncomingMessage::Notification(message) => {
+            emit(app, CodexRuntimeEvent::notification(message));
+        }
     }
 }
 
@@ -412,5 +524,56 @@ mod tests {
         let serialized = serde_json::to_value(event).unwrap();
         assert_eq!(serialized["kind"], "serverRequest");
         assert_eq!(serialized["payload"]["id"], 9);
+    }
+
+    #[test]
+    fn routes_results_errors_requests_and_notifications_without_guessing() {
+        match classify_message(json!({ "id": 1, "result": { "ok": true } })) {
+            IncomingMessage::Response { id, response } => {
+                assert_eq!(id, 1);
+                assert_eq!(response.unwrap()["ok"], true);
+            }
+            route => panic!("unexpected route: {route:?}"),
+        }
+
+        match classify_message(json!({
+            "id": 2,
+            "error": { "code": -32000, "message": "Not logged in" }
+        })) {
+            IncomingMessage::Response { id, response } => {
+                assert_eq!(id, 2);
+                assert_eq!(response.unwrap_err(), "Not logged in");
+            }
+            route => panic!("unexpected route: {route:?}"),
+        }
+
+        assert!(matches!(
+            classify_message(json!({
+                "id": "approval_1",
+                "method": "item/commandExecution/requestApproval",
+                "params": {}
+            })),
+            IncomingMessage::ServerRequest(_)
+        ));
+        assert!(matches!(
+            classify_message(json!({ "method": "turn/completed", "params": {} })),
+            IncomingMessage::Notification(_)
+        ));
+    }
+
+    #[test]
+    fn requires_an_account_only_when_openai_auth_is_required() {
+        assert!(account_is_authenticated(&json!({
+            "account": { "type": "chatgpt" },
+            "requiresOpenaiAuth": true
+        })));
+        assert!(!account_is_authenticated(&json!({
+            "account": null,
+            "requiresOpenaiAuth": true
+        })));
+        assert!(account_is_authenticated(&json!({
+            "account": null,
+            "requiresOpenaiAuth": false
+        })));
     }
 }
