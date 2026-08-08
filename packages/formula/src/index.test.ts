@@ -70,4 +70,28 @@ describe("formula engine", () => {
     expect(validateFormula("SUM(A1:A3")).toContain("Expected right-paren");
     expect(validateFormula("")).toBe("Formula is empty");
   });
+
+  test("supports common math and logical functions", () => {
+    const sheet = createSheet();
+    sheet.cells.A1 = { address: "A1", value: null, formula: "ROUND(12.345,2)" };
+    sheet.cells.A2 = { address: "A2", value: null, formula: "ROUNDUP(-12.341,2)" };
+    sheet.cells.A3 = { address: "A3", value: null, formula: "ROUNDDOWN(12.349,2)" };
+    sheet.cells.A4 = { address: "A4", value: null, formula: "ABS(-3)+COUNTA(1,\"x\",\"\")" };
+    sheet.cells.A5 = { address: "A5", value: null, formula: "AND(TRUE,NOT(FALSE),OR(FALSE,1))" };
+    expect(calculateCell(sheet, "A1")).toBe(12.35);
+    expect(calculateCell(sheet, "A2")).toBe(-12.35);
+    expect(calculateCell(sheet, "A3")).toBe(12.34);
+    expect(calculateCell(sheet, "A4")).toBe(5);
+    expect(calculateCell(sheet, "A5")).toBe(true);
+  });
+
+  test("supports common text functions", () => {
+    const sheet = createSheet();
+    sheet.cells.A1 = { address: "A1", value: null, formula: 'CONCAT(UPPER("office"),"-",LOWER("IDE"))' };
+    sheet.cells.A2 = { address: "A2", value: null, formula: 'LEFT("abcdef",2)&RIGHT("abcdef",2)' };
+    sheet.cells.A3 = { address: "A3", value: null, formula: 'MID("abcdef",2,3)&LEN("日本語")' };
+    expect(calculateCell(sheet, "A1")).toBe("OFFICE-ide");
+    expect(calculateCell(sheet, "A2")).toBe("abef");
+    expect(calculateCell(sheet, "A3")).toBe("bcd3");
+  });
 });

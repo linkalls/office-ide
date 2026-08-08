@@ -1,4 +1,4 @@
-import { useMemo, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   calculateSheet,
   isCalculatedError,
@@ -21,6 +21,62 @@ function formatCell(value: FormulaValue | undefined): string {
   if (typeof value === "number") return value.toLocaleString("ja-JP");
   if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
   return String(value ?? "");
+}
+
+interface CellInputProps {
+  address: string;
+  rawValue: string;
+  displayValue: string;
+  style: CSSProperties;
+  onCommit: (value: string) => void;
+  onSelect: (extend: boolean) => void;
+}
+
+/** 計算結果の表示と、入力途中のformula draftを分離する。 */
+function CellInput({ address, rawValue, displayValue, style, onCommit, onSelect }: CellInputProps) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(rawValue);
+  const cancelRef = useRef(false);
+
+  useEffect(() => {
+    if (!editing) setDraft(rawValue);
+  }, [editing, rawValue]);
+
+  return (
+    <input
+      aria-label={`Cell ${address}`}
+      value={editing ? draft : displayValue}
+      style={style}
+      onMouseDown={(event) => {
+        if (!event.shiftKey) return;
+        event.preventDefault();
+        onSelect(true);
+      }}
+      onFocus={() => {
+        cancelRef.current = false;
+        setDraft(rawValue);
+        setEditing(true);
+        onSelect(false);
+      }}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={() => {
+        setEditing(false);
+        if (cancelRef.current) {
+          cancelRef.current = false;
+          setDraft(rawValue);
+          return;
+        }
+        if (draft !== rawValue) onCommit(draft);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") event.currentTarget.blur();
+        if (event.key === "Escape") {
+          cancelRef.current = true;
+          event.currentTarget.blur();
+        }
+      }}
+    />
+  );
 }
 
 export function SpreadsheetGrid({ workspace }: Props) {
@@ -83,10 +139,20 @@ export function SpreadsheetGrid({ workspace }: Props) {
                 const cell = cells[address];
                 const isHeader = row === 1 && column !== "G";
                 const isTotal = row === 16 && column !== "G";
+                const bounds = workspace.selectionBounds;
+                const selected = Boolean(
+                  bounds
+                  && columnToIndex(column) >= bounds.firstColumn
+                  && columnToIndex(column) <= bounds.lastColumn
+                  && row >= bounds.firstRow
+                  && row <= bounds.lastRow,
+                );
+                const rawValue = cell?.formula ? `=${cell.formula}` : String(cell?.value ?? "");
                 return (
                   <td
                     key={address}
                     data-active={workspace.activeCell === address}
+                    data-selected={selected}
                     data-formula-error={isCalculatedError(calculated[address])}
                     data-header={isHeader}
                     data-total={isTotal}
@@ -94,25 +160,19 @@ export function SpreadsheetGrid({ workspace }: Props) {
                       backgroundColor: cell?.style?.background,
                       color: cell?.style?.foreground,
                     }}
-                    onClick={() => {
-                      workspace.setActiveCell(address);
-                      workspace.setSelection(address);
-                    }}
                   >
-                    <input
-                      aria-label={`Cell ${address}`}
-                      value={rendered.get(address) ?? ""}
+                    <CellInput
+                      address={address}
+                      rawValue={rawValue}
+                      displayValue={rendered.get(address) ?? ""}
                       style={{
                         color: cell?.style?.foreground,
                         fontWeight: cell?.style?.bold ? 700 : undefined,
                         fontStyle: cell?.style?.italic ? "italic" : undefined,
                         textAlign: cell?.style?.horizontalAlign,
                       }}
-                      onFocus={() => {
-                        workspace.setActiveCell(address);
-                        workspace.setSelection(address);
-                      }}
-                      onChange={(event) => workspace.applyCellEdit(address, event.target.value.replaceAll(",", ""))}
+                      onSelect={(extend) => workspace.selectCell(address, extend)}
+                      onCommit={(value) => workspace.applyCellEdit(address, value.replaceAll(",", ""))}
                     />
                   </td>
                 );

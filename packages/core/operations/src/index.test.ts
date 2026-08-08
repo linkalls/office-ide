@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { createEmptyWorkbook } from "@office-ide/spreadsheet-ir";
-import { applySpreadsheetOperations } from "./index";
+import { applySpreadsheetOperations, translateFormulaReferences } from "./index";
 
 describe("spreadsheet operations", () => {
   test("applies formatting without replacing cell content", () => {
@@ -119,5 +119,48 @@ describe("spreadsheet operations", () => {
     expect(() => applySpreadsheetOperations(workbook, [
       { type: "delete-columns", sheetId: "sheet-1", at: 27, count: 1 },
     ])).toThrow(RangeError);
+  });
+
+  test("fills a range with relative formulas and preserves absolute references", () => {
+    const workbook = createEmptyWorkbook();
+    workbook.sheets[0]!.cells.D2 = {
+      address: "D2",
+      value: null,
+      formula: "B2*C2+$A$1",
+      style: { bold: true },
+    };
+
+    const changed = applySpreadsheetOperations(workbook, [{
+      type: "fill-formula",
+      sheetId: "sheet-1",
+      range: "D2:D5",
+      sourceAddress: "D2",
+      formula: "B2*C2+$A$1",
+    }]);
+
+    expect(changed.sheets[0]?.cells.D2?.formula).toBe("B2*C2+$A$1");
+    expect(changed.sheets[0]?.cells.D3?.formula).toBe("B3*C3+$A$1");
+    expect(changed.sheets[0]?.cells.D5?.formula).toBe("B5*C5+$A$1");
+    expect(changed.sheets[0]?.cells.D2?.style).toEqual({ bold: true });
+    expect(workbook.sheets[0]?.cells.D3).toBeUndefined();
+  });
+
+  test("translates mixed references in two dimensions", () => {
+    expect(translateFormulaReferences("A1+$B1+C$1+$D$1", 2, 3))
+      .toBe("C4+$B4+E$1+$D$1");
+    expect(translateFormulaReferences("A1", -1, 0)).toBe("#REF!");
+    expect(translateFormulaReferences('"A1"&A1', 1, 1)).toBe('"A1"&B2');
+  });
+
+  test("applies multi-row and multi-column structural operations", () => {
+    const workbook = createEmptyWorkbook();
+    workbook.sheets[0]!.cells.C4 = { address: "C4", value: "moved" };
+
+    const changed = applySpreadsheetOperations(workbook, [
+      { type: "insert-rows", sheetId: "sheet-1", at: 2, count: 2 },
+      { type: "insert-columns", sheetId: "sheet-1", at: 2, count: 3 },
+    ]);
+
+    expect(changed.sheets[0]?.cells.F6?.value).toBe("moved");
   });
 });

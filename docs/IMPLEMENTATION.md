@@ -89,4 +89,15 @@ KDL formula → Spreadsheet IR → parser/evaluator → calculated Grid value
 
 The first slice supports arithmetic and exponentiation, parentheses and unary operators, comparisons, string concatenation, booleans, cell/range references, and `SUM`, `COUNT`, `AVERAGE`, `MIN`, `MAX`, and lazy `IF`. Recursive references are cached; circular references and common spreadsheet errors render as `#CYCLE!`, `#REF!`, `#DIV/0!`, `#VALUE!`, `#NAME?`, or `#ERROR!`. Malformed formulas remain in the IR/source, appear as an error in the Grid and Problems view, and Undo restores both the previous formula and diagnostics state.
 
-This is intentionally an Excel-like subset, not an Excel-complete engine. Date/time functions, arrays, named ranges, cross-sheet references, locale-specific syntax, and the larger function catalog remain pending.
+The function set also includes `ABS`, `ROUND`, `ROUNDUP`, `ROUNDDOWN`, `AND`, `OR`, `NOT`, `COUNTA`, `CONCAT`, `CONCATENATE`, `LEN`, `LOWER`, `UPPER`, `LEFT`, `RIGHT`, and `MID`. This is intentionally an Excel-like subset, not an Excel-complete engine. Date/time functions, arrays, named ranges, cross-sheet references, locale-specific syntax, and the larger function catalog remain pending.
+
+## Phase 1 range and formula-fill slice
+
+Grid inputs now keep a local draft while typing and commit on Enter or blur, preventing partial formulas from being replaced by transient calculation errors. Shift-click extends the active selection and drives two semantic workflows:
+
+```text
+formula cell → Shift-click range → Σ → fill-formula transaction
+selected range → +R / −R / +C / −C → count-aware structure transaction
+```
+
+`fill-formula` translates row and column references from the active source cell across the range, preserves `$` absolute markers and quoted A1-like text, retains each destination style, serializes every generated formula to KDL, and is reverted by one Undo. Row and column controls use the selected span as their operation count, so multiple rows or columns move in a single transaction.

@@ -21,6 +21,13 @@ import { SAMPLE_SHEET_SOURCE } from "../data/sampleSource";
 export type WorkbenchView = EditorContext["activeView"];
 type StructureOperationType = Extract<SpreadsheetOperation, { at: number }>["type"];
 
+interface SelectionBounds {
+  firstColumn: number;
+  lastColumn: number;
+  firstRow: number;
+  lastRow: number;
+}
+
 interface HistoryEntry {
   transaction: Transaction;
   before: SpreadsheetWorkbook;
@@ -33,6 +40,42 @@ const initialWorkbook = initialParse.workbook;
 
 function getWorkbookDiagnostics(workbook: SpreadsheetWorkbook): Diagnostic[] {
   return parseSpreadsheetSource(serializeSpreadsheetSource(workbook)).diagnostics;
+}
+
+function columnLabelToIndex(label: string): number {
+  return [...label].reduce(
+    (index, character) => index * 26 + character.charCodeAt(0) - 64,
+    0,
+  );
+}
+
+function columnIndexToLabel(index: number): string {
+  let current = index;
+  let label = "";
+  while (current > 0) {
+    current -= 1;
+    label = String.fromCharCode(65 + (current % 26)) + label;
+    current = Math.floor(current / 26);
+  }
+  return label;
+}
+
+function parseAddress(address: string): { column: number; row: number } | null {
+  const match = address.match(/^([A-Z]+)([1-9]\d*)$/);
+  return match ? { column: columnLabelToIndex(match[1]), row: Number(match[2]) } : null;
+}
+
+export function getSelectionBounds(selection: string): SelectionBounds | null {
+  const [startAddress, endAddress = startAddress] = selection.split(":");
+  const start = parseAddress(startAddress);
+  const end = parseAddress(endAddress);
+  if (!start || !end) return null;
+  return {
+    firstColumn: Math.min(start.column, end.column),
+    lastColumn: Math.max(start.column, end.column),
+    firstRow: Math.min(start.row, end.row),
+    lastRow: Math.max(start.row, end.row),
+  };
 }
 
 export function useOfficeWorkspace() {
@@ -51,6 +94,36 @@ export function useOfficeWorkspace() {
   const sourceUpdateOrigin = useRef<"visual" | "source">("visual");
 
   const activeSheet = useMemo(() => getActiveSheet(workbook), [workbook]);
+  const selectionBounds = useMemo(() => getSelectionBounds(selection), [selection]);
+  const canFillFormula = useMemo(() => {
+    const position = parseAddress(activeCell);
+    return Boolean(
+      activeSheet.cells[activeCell]?.formula
+      && position
+      && selectionBounds
+      && position.column >= selectionBounds.firstColumn
+      && position.column <= selectionBounds.lastColumn
+      && position.row >= selectionBounds.firstRow
+      && position.row <= selectionBounds.lastRow
+      && (selectionBounds.firstColumn !== selectionBounds.lastColumn
+        || selectionBounds.firstRow !== selectionBounds.lastRow),
+    );
+  }, [activeCell, activeSheet.cells, selectionBounds]);
+
+  const selectCell = useCallback((address: string, extend = false) => {
+    if (!extend) {
+      setActiveCell(address);
+      setSelection(address);
+      return;
+    }
+    const anchor = parseAddress(activeCell);
+    const target = parseAddress(address);
+    if (!anchor || !target) return;
+    setSelection(
+      `${columnIndexToLabel(Math.min(anchor.column, target.column))}${Math.min(anchor.row, target.row)}`
+      + `:${columnIndexToLabel(Math.max(anchor.column, target.column))}${Math.max(anchor.row, target.row)}`,
+    );
+  }, [activeCell]);
 
   const applyCellEdit = useCallback(
     (address: string, nextValue: string) => {
@@ -156,20 +229,20 @@ export function useOfficeWorkspace() {
   );
 
   const applySheetStructure = useCallback(
-    (type: StructureOperationType, at: number) => {
+    (type: StructureOperationType, at: number, count = 1) => {
       const before = workbook;
       const operation = {
         type,
         sheetId: activeSheet.id,
         at,
-        count: 1,
+        count,
       } as Extract<SpreadsheetOperation, { at: number }>;
       const after = applySpreadsheetOperations(before, [operation]);
       const labels: Record<StructureOperationType, string> = {
-        "insert-rows": `Inserted row ${at}`,
-        "delete-rows": `Deleted row ${at}`,
-        "insert-columns": `Inserted column ${at}`,
-        "delete-columns": `Deleted column ${at}`,
+        "insert-rows": `Inserted ${count} row${count === 1 ? "" : "s"} at ${at}`,
+        "delete-rows": `Deleted ${count} row${count === 1 ? "" : "s"} at ${at}`,
+        "insert-columns": `Inserted ${count} column${count === 1 ? "" : "s"} at ${at}`,
+        "delete-columns": `Deleted ${count} column${count === 1 ? "" : "s"} at ${at}`,
       };
       const transaction = createTransaction(labels[type], [operation]);
       sourceUpdateOrigin.current = "visual";
@@ -181,6 +254,27 @@ export function useOfficeWorkspace() {
     },
     [activeSheet.id, workbook],
   );
+
+  const applyFormulaFill = useCallback(() => {
+    const sourceCell = activeSheet.cells[activeCell];
+    if (!sourceCell?.formula || !selectionBounds || !canFillFormula) return;
+    const before = workbook;
+    const operation = {
+      type: "fill-formula" as const,
+      sheetId: activeSheet.id,
+      range: selection,
+      sourceAddress: activeCell,
+      formula: sourceCell.formula,
+    };
+    const after = applySpreadsheetOperations(before, [operation]);
+    const transaction = createTransaction(`Filled formula through ${selection}`, [operation]);
+    sourceUpdateOrigin.current = "visual";
+    setWorkbook(after);
+    setSource(serializeSpreadsheetSource(after));
+    setHistory((entries) => [...entries, { transaction, before, after }]);
+    setRedoStack([]);
+    setDiagnostics(getWorkbookDiagnostics(after));
+  }, [activeCell, activeSheet.cells, activeSheet.id, canFillFormula, selection, selectionBounds, workbook]);
 
   useEffect(() => {
     if (sourceUpdateOrigin.current !== "source") return;
@@ -261,6 +355,8 @@ export function useOfficeWorkspace() {
     canRedo: redoStack.length > 0,
     activeCell,
     selection,
+    selectionBounds,
+    canFillFormula,
     activeView,
     agentOpen,
     explorerOpen,
@@ -271,11 +367,13 @@ export function useOfficeWorkspace() {
     applyColumnWidth,
     applyRowHeight,
     applySheetStructure,
+    applyFormulaFill,
     editSource,
     undo,
     redo,
     setActiveCell,
     setSelection,
+    selectCell,
     setActiveView,
     setAgentOpen,
     setExplorerOpen,

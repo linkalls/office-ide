@@ -276,7 +276,10 @@ class FormulaParser {
 
   private parseComparison(): FormulaNode {
     let left = this.parseConcatenation();
-    while (["=", "<>", "<", ">", "<=", ">="].includes(this.current().text)) {
+    while (
+      this.current().type === "operator"
+      && ["=", "<>", "<", ">", "<=", ">="].includes(this.current().text)
+    ) {
       const operator = this.take().text as BinaryNode["operator"];
       left = { type: "binary", operator, left, right: this.parseConcatenation() };
     }
@@ -293,7 +296,10 @@ class FormulaParser {
 
   private parseAdditive(): FormulaNode {
     let left = this.parseMultiplicative();
-    while (this.current().text === "+" || this.current().text === "-") {
+    while (
+      this.current().type === "operator"
+      && (this.current().text === "+" || this.current().text === "-")
+    ) {
       const operator = this.take().text as "+" | "-";
       left = { type: "binary", operator, left, right: this.parseMultiplicative() };
     }
@@ -302,7 +308,10 @@ class FormulaParser {
 
   private parseMultiplicative(): FormulaNode {
     let left = this.parseUnary();
-    while (this.current().text === "*" || this.current().text === "/") {
+    while (
+      this.current().type === "operator"
+      && (this.current().text === "*" || this.current().text === "/")
+    ) {
       const operator = this.take().text as "*" | "/";
       left = { type: "binary", operator, left, right: this.parseUnary() };
     }
@@ -316,7 +325,10 @@ class FormulaParser {
   }
 
   private parseUnary(): FormulaNode {
-    if (this.current().text === "+" || this.current().text === "-") {
+    if (
+      this.current().type === "operator"
+      && (this.current().text === "+" || this.current().text === "-")
+    ) {
       const operator = this.take().text as "+" | "-";
       return { type: "unary", operator, operand: this.parseUnary() };
     }
@@ -388,6 +400,21 @@ function isTruthy(value: FormulaValue): boolean | FormulaError {
 
 function flatten(values: EvaluatedValue[]): FormulaValue[] {
   return values.flatMap((value) => Array.isArray(value) ? value : [value]);
+}
+
+function asText(value: FormulaValue): string | FormulaError {
+  if (isFormulaError(value)) return value;
+  if (value === null) return "";
+  if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+  return String(value);
+}
+
+function roundWithMode(value: number, digits: number, mode: "nearest" | "up" | "down"): number {
+  const factor = 10 ** Math.trunc(digits);
+  const scaled = value * factor;
+  if (mode === "nearest") return Math.round(scaled + Number.EPSILON) / factor;
+  if (mode === "up") return (scaled < 0 ? Math.floor(scaled) : Math.ceil(scaled)) / factor;
+  return (scaled < 0 ? Math.ceil(scaled) : Math.floor(scaled)) / factor;
 }
 
 class SheetCalculator {
@@ -498,6 +525,23 @@ class SheetCalculator {
       return branch ? asScalar(this.evaluate(branch)) : false;
     }
 
+    if (node.name === "AND" || node.name === "OR") {
+      const values = flatten(node.arguments.map((argument) => this.evaluate(argument)));
+      const booleans: boolean[] = [];
+      for (const value of values) {
+        const truthy = isTruthy(value);
+        if (isFormulaError(truthy)) return truthy;
+        booleans.push(truthy);
+      }
+      return node.name === "AND" ? booleans.every(Boolean) : booleans.some(Boolean);
+    }
+
+    if (node.name === "NOT") {
+      if (node.arguments.length !== 1) return "#VALUE!";
+      const truthy = isTruthy(asScalar(this.evaluate(node.arguments[0])));
+      return isFormulaError(truthy) ? truthy : !truthy;
+    }
+
     const values = flatten(node.arguments.map((argument) => this.evaluate(argument)));
     const firstError = values.find(isFormulaError);
     if (firstError) return firstError;
@@ -506,6 +550,7 @@ class SheetCalculator {
 
     if (node.name === "SUM") return numbers.reduce((sum, value) => sum + value, 0);
     if (node.name === "COUNT") return numbers.length;
+    if (node.name === "COUNTA") return values.filter((value) => value !== null && value !== "").length;
     if (node.name === "AVERAGE") {
       return numbers.length === 0
         ? "#DIV/0!"
@@ -513,6 +558,43 @@ class SheetCalculator {
     }
     if (node.name === "MIN") return numbers.length === 0 ? 0 : Math.min(...numbers);
     if (node.name === "MAX") return numbers.length === 0 ? 0 : Math.max(...numbers);
+    if (node.name === "ABS") {
+      const number = asNumber(values[0] ?? null);
+      return values.length !== 1 || isFormulaError(number) ? "#VALUE!" : Math.abs(number);
+    }
+    if (["ROUND", "ROUNDUP", "ROUNDDOWN"].includes(node.name)) {
+      if (values.length < 1 || values.length > 2) return "#VALUE!";
+      const number = asNumber(values[0] ?? null);
+      const digits = asNumber(values[1] ?? 0);
+      if (isFormulaError(number)) return number;
+      if (isFormulaError(digits)) return digits;
+      const mode = node.name === "ROUND" ? "nearest" : node.name === "ROUNDUP" ? "up" : "down";
+      return roundWithMode(number, digits, mode);
+    }
+    if (node.name === "CONCAT" || node.name === "CONCATENATE") {
+      const text: string[] = [];
+      for (const value of values) {
+        const part = asText(value);
+        if (isFormulaError(part)) return part;
+        text.push(part);
+      }
+      return text.join("");
+    }
+    if (["LEN", "LOWER", "UPPER", "LEFT", "RIGHT", "MID"].includes(node.name)) {
+      const text = asText(values[0] ?? null);
+      if (isFormulaError(text)) return text;
+      if (node.name === "LEN") return values.length === 1 ? text.length : "#VALUE!";
+      if (node.name === "LOWER") return values.length === 1 ? text.toLowerCase() : "#VALUE!";
+      if (node.name === "UPPER") return values.length === 1 ? text.toUpperCase() : "#VALUE!";
+      const count = asNumber(values[1] ?? 1);
+      if (isFormulaError(count)) return count;
+      if (node.name === "LEFT") return values.length <= 2 ? text.slice(0, Math.max(0, Math.trunc(count))) : "#VALUE!";
+      if (node.name === "RIGHT") return values.length <= 2 ? text.slice(-Math.max(0, Math.trunc(count))) : "#VALUE!";
+      if (values.length !== 3) return "#VALUE!";
+      const length = asNumber(values[2]);
+      if (isFormulaError(length)) return length;
+      return text.slice(Math.max(0, Math.trunc(count) - 1), Math.max(0, Math.trunc(count) - 1) + Math.max(0, Math.trunc(length)));
+    }
     return "#NAME?";
   }
 }

@@ -17,6 +17,25 @@ type StructureAxis = "row" | "column";
 type StructureMode = "insert" | "delete";
 
 const CELL_REFERENCE_PATTERN = /(\$?)([A-Z]+)(\$?)([1-9]\d*)/gi;
+const FORMULA_STRING_PATTERN = /("(?:[^"]|"")*")/g;
+
+function rewriteFormulaReferences(
+  formula: string,
+  rewrite: (
+    match: string,
+    columnMarker: string,
+    columnLabel: string,
+    rowMarker: string,
+    rowText: string,
+  ) => string,
+): string {
+  return formula
+    .split(FORMULA_STRING_PATTERN)
+    .map((segment, index) => index % 2 === 1
+      ? segment
+      : segment.replace(CELL_REFERENCE_PATTERN, rewrite))
+    .join("");
+}
 
 function columnLabelToIndex(label: string): number {
   let result = 0;
@@ -50,6 +69,13 @@ function formatCellAddress(position: CellPosition): string {
   return `${columnIndexToLabel(position.column)}${position.row}`;
 }
 
+function parseCellRange(range: string): { start: CellPosition; end: CellPosition } | null {
+  const [startAddress, endAddress = startAddress] = range.split(":");
+  const start = parseCellAddress(startAddress);
+  const end = parseCellAddress(endAddress);
+  return start && end ? { start, end } : null;
+}
+
 function validateStructureRange(at: number, count: number): void {
   if (!Number.isInteger(at) || at < 1 || !Number.isInteger(count) || count < 1) {
     throw new RangeError("Row and column operations require positive integer positions and counts");
@@ -74,8 +100,8 @@ function transformFormulaReferences(
   count: number,
   mode: StructureMode,
 ): string {
-  return formula.replace(
-    CELL_REFERENCE_PATTERN,
+  return rewriteFormulaReferences(
+    formula,
     (_match, columnMarker: string, columnLabel: string, rowMarker: string, rowText: string) => {
       const position = {
         column: columnLabelToIndex(columnLabel),
@@ -87,6 +113,26 @@ function transformFormulaReferences(
       if (axis === "row") position.row = transformed;
       else position.column = transformed;
       return `${columnMarker}${columnIndexToLabel(position.column)}${rowMarker}${position.row}`;
+    },
+  );
+}
+
+/**
+ * Excelのcopy/fillと同じように相対参照だけを移動する。
+ * `$A$1`は固定、`A$1`は列だけ、`$A1`は行だけを移動する。
+ */
+export function translateFormulaReferences(
+  formula: string,
+  columnOffset: number,
+  rowOffset: number,
+): string {
+  return rewriteFormulaReferences(
+    formula,
+    (_match, columnMarker: string, columnLabel: string, rowMarker: string, rowText: string) => {
+      const column = columnLabelToIndex(columnLabel) + (columnMarker ? 0 : columnOffset);
+      const row = Number(rowText) + (rowMarker ? 0 : rowOffset);
+      if (column < 1 || row < 1) return "#REF!";
+      return `${columnMarker}${columnIndexToLabel(column)}${rowMarker}${row}`;
     },
   );
 }
@@ -174,6 +220,13 @@ export type SpreadsheetOperation =
       sheetId: string;
       at: number;
       count: number;
+    }
+  | {
+      type: "fill-formula";
+      sheetId: string;
+      range: string;
+      sourceAddress: string;
+      formula: string;
     };
 
 export interface Transaction {
@@ -207,6 +260,36 @@ export function applySpreadsheetOperations(
 
     if (operation.type === "set-row-height") {
       sheet.rowHeights[operation.row] = operation.height;
+      continue;
+    }
+
+    if (operation.type === "fill-formula") {
+      const range = parseCellRange(operation.range);
+      const sourcePosition = parseCellAddress(operation.sourceAddress);
+      if (!range || !sourcePosition) throw new RangeError("Formula fill requires a valid A1 range");
+      const firstColumn = Math.min(range.start.column, range.end.column);
+      const lastColumn = Math.max(range.start.column, range.end.column);
+      const firstRow = Math.min(range.start.row, range.end.row);
+      const lastRow = Math.max(range.start.row, range.end.row);
+      if (lastColumn > sheet.columnCount || lastRow > sheet.rowCount) {
+        throw new RangeError("Formula fill range is outside the sheet");
+      }
+      for (let row = firstRow; row <= lastRow; row += 1) {
+        for (let column = firstColumn; column <= lastColumn; column += 1) {
+          const address = formatCellAddress({ column, row });
+          const previous = sheet.cells[address];
+          sheet.cells[address] = {
+            address,
+            value: null,
+            formula: translateFormulaReferences(
+              operation.formula,
+              column - sourcePosition.column,
+              row - sourcePosition.row,
+            ),
+            style: previous?.style,
+          };
+        }
+      }
       continue;
     }
 

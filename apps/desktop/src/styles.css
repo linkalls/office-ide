@@ -227,7 +227,7 @@ textarea:focus-visible {
 
 .spreadsheet-editor { flex: 1; min-height: 0; display: grid; grid-template-rows: 36px 38px minmax(0, 1fr); }
 .formula-row { display: flex; align-items: center; gap: 0; padding: 4px 8px; border-bottom: 1px solid var(--border-soft); background: #101925; }
-.name-box { height: 27px; width: 92px; display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--border); border-radius: 4px; padding: 0 8px; background: #0c141f; color: #c5ceda; font-size: 11px; }
+.name-box { height: 27px; width: 108px; display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--border); border-radius: 4px; padding: 0 8px; overflow: hidden; background: #0c141f; color: #c5ceda; font-size: 11px; white-space: nowrap; }
 .formula-symbol { width: 36px; text-align: center; color: #6f7d90; font-family: Georgia, serif; font-style: italic; }
 .formula-input { flex: 1; height: 27px; border: 1px solid var(--border); border-radius: 4px; padding: 0 9px; color: #d8e0e9; background: #0c141f; font-size: 11px; }
 .format-toolbar { display: flex; align-items: center; gap: 2px; overflow-x: auto; padding: 4px 8px; border-bottom: 1px solid var(--border); background: #111a27; scrollbar-width: none; }
@@ -235,6 +235,8 @@ textarea:focus-visible {
 .toolbar-button, .toolbar-select { height: 27px; border: 0; border-radius: 4px; background: transparent; color: #aeb9c7; cursor: pointer; font-size: 11px; }
 .toolbar-button { width: 29px; display: grid; place-items: center; }
 .toolbar-button:hover, .toolbar-select:hover { background: var(--hover); color: white; }
+.toolbar-button:disabled { opacity: 0.32; cursor: not-allowed; }
+.toolbar-button:disabled:hover { color: #aeb9c7; background: transparent; }
 .toolbar-button[aria-pressed="true"] { background: var(--accent-soft); color: #dcecff; }
 .toolbar-button:disabled { opacity: .35; cursor: default; }
 .toolbar-select { display: flex; align-items: center; justify-content: space-between; width: 94px; padding: 0 8px; }
@@ -258,7 +260,9 @@ textarea:focus-visible {
 .spreadsheet-grid th[data-active="true"] { background: #1d4a7e; color: #ddebff; }
 .spreadsheet-grid td { position: relative; background: #0f1824; }
 .spreadsheet-grid td:hover { background: #152234; }
+.spreadsheet-grid td[data-selected="true"] { background: #142b44; box-shadow: inset 0 0 0 1px rgb(47 129 247 / 24%); }
 .spreadsheet-grid td[data-header="true"] { background: #1b3f68; }
+.spreadsheet-grid td[data-header="true"][data-selected="true"] { background: #235382; }
 .spreadsheet-grid td[data-total="true"] { background: #142337; font-weight: 700; border-top: 1px solid #4777ab; }
 .spreadsheet-grid td[data-active="true"]::after { content: ""; pointer-events: none; position: absolute; inset: -1px; border: 2px solid var(--accent); z-index: 3; }
 .spreadsheet-grid td[data-formula-error="true"] input { color: #ff9b9b; font-weight: 650; }
