@@ -353,9 +353,16 @@ textarea:focus-visible {
 .agent-message { margin: 11px 0; padding: 9px 10px; border: 1px solid var(--border-soft); border-radius: 5px; background: #0f1925; }
 .agent-message[data-role="user"] { margin-left: 18px; border-color: #244e79; background: #10243a; }
 .agent-message[data-role="system"] { border-color: #28523d; background: #10251c; }
+.agent-message[data-role="system"][data-state="reverted"] { border-color: #6b4d22; background: #2a2013; }
+.agent-message[data-role="system"][data-state="re-applied"] { border-color: #2d5f86; background: #10243a; }
 .agent-message strong { display: block; margin-bottom: 4px; color: #7dbbff; font: 700 9px Inter, sans-serif; }
 .agent-message[data-role="system"] strong { color: #79d7a3; }
+.agent-message[data-role="system"][data-state="reverted"] strong { color: #f5bb67; }
+.agent-message[data-role="system"][data-state="re-applied"] strong { color: #7dbbff; }
 .agent-message p { margin: 0; color: #aebbc9; }
+.agent-transaction-state { display: block; margin-top: 7px; padding-top: 6px; border-top: 1px solid rgba(121,215,163,.18); color: #79d7a3; font: 700 8px/1.4 Inter, sans-serif; letter-spacing: .02em; }
+.agent-message[data-state="reverted"] .agent-transaction-state { border-color: rgba(245,187,103,.2); color: #f5bb67; }
+.agent-message[data-state="re-applied"] .agent-transaction-state { border-color: rgba(125,187,255,.2); color: #7dbbff; }
 .agent-suggestions { display: grid; gap: 5px; }
 .agent-suggestion { width: 100%; display: flex; align-items: center; gap: 7px; padding: 7px 9px; border: 1px dashed #315477; border-radius: 5px; color: #88bff7; background: #0e1b29; cursor: pointer; font-size: 9px; text-align: left; }
 .agent-suggestion:hover { border-style: solid; color: white; background: #14263a; }

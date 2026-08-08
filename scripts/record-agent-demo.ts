@@ -12,6 +12,7 @@ const ROOT = resolve(import.meta.dir, "..");
 const VIDEO_PATH = resolve(ROOT, "docs/media/office-ide-agent-demo.mp4");
 const REVIEW_IMAGE_PATH = resolve(ROOT, "docs/images/office-ide-agent-review.png");
 const APPLIED_IMAGE_PATH = resolve(ROOT, "docs/images/office-ide-agent-applied.png");
+const REVERTED_IMAGE_PATH = resolve(ROOT, "docs/images/office-ide-agent-reverted.png");
 
 const frameDirectory = await mkdtemp(join(tmpdir(), "office-ide-demo-"));
 let frame = 0;
@@ -301,6 +302,30 @@ async function hidePresentationLayer(page: Page): Promise<void> {
   camera = { scale: 1, x: 0, y: 0 };
 }
 
+async function captureCleanProductScreenshot(page: Page, path: string): Promise<void> {
+  const previousTransform = await page.locator("#root").evaluate((root) => {
+    const element = root as HTMLElement;
+    const transform = element.style.transform;
+    element.style.transition = "none";
+    element.style.transform = "translate3d(0,0,0) scale(1)";
+    return transform;
+  });
+  await page.evaluate(() => {
+    const layer = document.querySelector<HTMLElement>("#demo-presentation-layer");
+    if (layer) layer.style.display = "none";
+  });
+  await page.screenshot({ path, fullPage: false });
+  await page.locator("#root").evaluate((root, transform) => {
+    const element = root as HTMLElement;
+    element.style.transform = transform;
+    element.style.transition = "transform 160ms cubic-bezier(.2,.8,.2,1)";
+  }, previousTransform);
+  await page.evaluate(() => {
+    const layer = document.querySelector<HTMLElement>("#demo-presentation-layer");
+    if (layer) layer.style.display = "block";
+  });
+}
+
 try {
   await waitForServer();
   browser = await playwrightChromium.launch({
@@ -392,6 +417,10 @@ try {
   const revertedHistoryText = await page.locator(".history-list").innerText();
   const historyMarkedReverted = revertedHistoryText.includes("REVERTED")
     && revertedHistoryText.includes("Create regional sales summary sheet");
+  const revertedAgentCardText = await page.locator('.agent-message[data-state="reverted"]').innerText();
+  const agentCardMarkedReverted = revertedAgentCardText.includes("Reverted")
+    && revertedAgentCardText.includes("Redo available");
+  await captureCleanProductScreenshot(page, REVERTED_IMAGE_PATH);
   await hold(page, 450);
 
   await moveCamera(page, cameraPose(1.35, 1480, 70), 550);
@@ -404,6 +433,9 @@ try {
   const historyAfterRedo = await page.locator(".history-list").innerText();
   const historyMarkedApplied = historyAfterRedo.includes("APPLIED")
     && !historyAfterRedo.includes("REVERTED");
+  const reappliedAgentCardText = await page.locator('.agent-message[data-state="re-applied"]').innerText();
+  const agentCardMarkedReapplied = reappliedAgentCardText.includes("Re-applied")
+    && reappliedAgentCardText.includes("Undo available");
   await showState(page, "Reviewable · Attributed · Reversible", 850);
 
   // End the recorded story here. Recovery and responsive checks continue off-camera.
@@ -470,6 +502,8 @@ try {
     agentActorRecorded,
     historyMarkedReverted,
     historyMarkedApplied,
+    agentCardMarkedReverted,
+    agentCardMarkedReapplied,
     summaryAfterUndo,
     summaryAfterRedo,
     recoveredSheet,

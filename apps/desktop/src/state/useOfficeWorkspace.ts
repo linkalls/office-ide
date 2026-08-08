@@ -310,6 +310,7 @@ export function useOfficeWorkspace() {
     setDiagnostics(getWorkbookDiagnostics(after));
     setActiveCell(proposal.focusCell);
     setSelection(proposal.selection);
+    return transaction.id;
   }, [recordTransaction, workbook]);
 
   const addSheet = useCallback(() => {
@@ -483,6 +484,8 @@ export function useOfficeWorkspace() {
     history,
     canUndo: undoStack.length > 0,
     canRedo: redoStack.length > 0,
+    nextUndoTransactionId: undoStack.at(-1)?.transaction.id ?? null,
+    nextRedoTransactionId: redoStack.at(-1)?.transaction.id ?? null,
     activeCell,
     selection,
     selectionBounds,

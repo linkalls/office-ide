@@ -9,6 +9,7 @@ export interface HistoryEntry {
   after: SpreadsheetWorkbook;
   state: HistoryEntryState;
   stateChangedAt: number;
+  stateRevision: number;
 }
 
 export function createHistoryEntry(
@@ -22,6 +23,7 @@ export function createHistoryEntry(
     after,
     state: "applied",
     stateChangedAt: transaction.timestamp,
+    stateRevision: 0,
   };
 }
 
@@ -32,6 +34,18 @@ export function setHistoryEntryState(
   changedAt = Date.now(),
 ): HistoryEntry[] {
   return entries.map((entry) => entry.transaction.id === transactionId
-    ? { ...entry, state, stateChangedAt: changedAt }
+    ? {
+        ...entry,
+        state,
+        stateChangedAt: changedAt,
+        stateRevision: entry.stateRevision + 1,
+      }
     : entry);
+}
+
+export function getHistoryLifecycle(
+  entry: HistoryEntry,
+): "applied" | "reverted" | "re-applied" {
+  if (entry.state === "reverted") return "reverted";
+  return entry.stateRevision > 0 ? "re-applied" : "applied";
 }

@@ -1,7 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { createTransaction } from "@office-ide/operations";
 import type { SpreadsheetWorkbook } from "@office-ide/spreadsheet-ir";
-import { createHistoryEntry, setHistoryEntryState } from "./workspaceHistory";
+import {
+  createHistoryEntry,
+  getHistoryLifecycle,
+  setHistoryEntryState,
+} from "./workspaceHistory";
 
 const workbook = (name: string): SpreadsheetWorkbook => ({
   id: `workbook-${name}`,
@@ -32,6 +36,7 @@ describe("workspace history", () => {
     expect(reverted[0]?.transaction).toEqual(transaction);
     expect(reverted[0]?.state).toBe("reverted");
     expect(reverted[0]?.stateChangedAt).toBe(200);
+    expect(reverted[0] && getHistoryLifecycle(reverted[0])).toBe("reverted");
   });
 
   test("redo reactivates the same transaction instead of duplicating it", () => {
@@ -44,5 +49,7 @@ describe("workspace history", () => {
     expect(restored[0]?.transaction.id).toBe(transaction.id);
     expect(restored[0]?.state).toBe("applied");
     expect(restored[0]?.stateChangedAt).toBe(300);
+    expect(restored[0]?.stateRevision).toBe(2);
+    expect(restored[0] && getHistoryLifecycle(restored[0])).toBe("re-applied");
   });
 });

@@ -38,7 +38,7 @@ history / undo / redo
 | --- | --- | --- | --- |
 | Phase 0 — Foundation | 🟡 | Bun monorepo、React/Vite shell、Tauri 2/Rustの雛形、Explorer、tabs、command palette、resource-neutralなeditor shell、browser local autosave/recovery | 実workspace directoryの作成/読込/保存、Tauri commandの実接続、Rust toolchain上でのdesktop起動確認 |
 | Phase 1 — Spreadsheet Core | 🟡 | Spreadsheet IR、stable sheet ID、複数sheet lifecycle、KDL MVP parser/serializer、Grid/Source双方向更新、draft確定型cell/formula編集、Shift range選択、相対数式フィル、cell style、row/columnのsize・複数挿入・削除semantic operation、A1数式参照shift、基本数式engine、構文診断、version付きautosave、基本transaction、Undo/Redo | Univer Sheets、Excel互換の完全な数式計算、named style、ドラッグ選択、AST-preserving patch、filesystem永続化、完全なKDL 2.0 |
-| Phase 2 — Agent Infrastructure | 🟡 | Agent pane、Claude/Codex/Cursor/Shell tabs、context表示、平均単価/税込列/売上しきい値強調/地域別summary sheetのlocal planner、Workbook値走査、proposal review、semantic operation一括適用、Agent attribution、append-only History、REVERTED/APPLIED状態、Undo/Redo | 実LLM/CLI接続、xterm.js、portable-pty、CLI launcher、sheetctl、local IPC、Skills、完全なsemantic diff |
+| Phase 2 — Agent Infrastructure | 🟡 | Agent pane、Claude/Codex/Cursor/Shell tabs、context表示、平均単価/税込列/売上しきい値強調/地域別summary sheetのlocal planner、Workbook値走査、proposal review、semantic operation一括適用、Agent attribution、append-only History、Agent card lifecycle同期、REVERTED/APPLIED状態、Undo/Redo | Codex app-server実接続、他providerのxterm.js/portable-pty、sheetctl、local IPC、Skills、完全なsemantic diff |
 | Phase 3 — XLSX | ⬜ | なし | importer/exporter、compatibility report、opaque OOXML preservation |
 | Phase 4 — Document Core | ⬜ | Explorer上のdocument見本のみ | Univer Docs、Document IR、Djot、layout KDL、双方向同期、docctl、Document Skill |
 | Phase 5 — DOCX | ⬜ | なし | importer/exporter、compatibility report、opaque OOXML preservation |
@@ -121,8 +121,8 @@ bun run build
 - TypeScript typecheck: pass
 - Bun tests: 39 passed / 0 failed
 - Vite production build: pass
-- Browser QA: 文字単位のAgent prompt入力、地域別集計proposal review、31 operations適用、Agent History、Undo/Redo、reload recoveryがpass。売上50万円以上の4行を検出し24 operations適用/Undoもpass。1600×900と980×760でbody overflowなし、console warning/errorなし
-- README media QA: 22秒/440 frames/20fps/1920×1080。2400×1350 sourceから高品質縮小し、大型カーソルの各target到達、Undo後REVERTED、Redo後APPLIEDを検証し、MP4全体をffmpegで再デコード済み
+- Browser QA: 文字単位のAgent prompt入力、地域別集計proposal review、31 operations適用、Agent History、Undo/Redo、Agent cardのReverted/Re-applied同期、reload recoveryがpass。売上50万円以上の4行を検出し24 operations適用/Undoもpass。1600×900と980×760でbody overflowなし、console warning/errorなし
+- README media QA: 22秒/440 frames/20fps/1920×1080。2400×1350 sourceから高品質縮小し、大型カーソルの各target到達、Undo後History REVERTED/Agent card Reverted、Redo後History APPLIED/Agent card Re-appliedを検証し、MP4全体をffmpegで再デコード済み
 - Rust/Tauri compile: 未確認（検証環境にRust toolchainなし）
 
 ## 6. 次に実装する順序
@@ -136,7 +136,7 @@ bun run build
 5. browser snapshotからfilesystem-backed workspaceへ進め、open/create/save/loadをTauri command経由で実装する。
 6. formula engineを日付・配列・sheet間参照へ拡張し、named styleとtestsを追加する。基本関数、相対数式フィル、複数行列操作は実装済み。
 7. integration testで `source → IR → visual` と `visual → operation → IR → source` を固定する。
-8. Phase 2の既存proposal境界へxterm.js、portable-pty、Codex/Claude CLI、local IPC、`sheetctl`を接続し、Agent paneをChat/Terminalの二層表示にする。CLI自身のapprovalはPTYへ残し、Office semantic operationsだけをProposal cardでreviewする。
+8. Phase 2の既存proposal境界へCodex app-server、他provider用xterm.js/portable-pty、local IPC、`sheetctl`を接続し、Agent paneをChat/Terminalの二層表示にする。Codexのthread/turn/event/approvalはapp-serverから構造化取得し、Office semantic operationsだけをProposal cardでreviewする。
 
 最小の次ゴール:
 

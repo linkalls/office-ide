@@ -9,12 +9,16 @@ import {
   TerminalSquare,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   planAgentRequest,
   type AgentProposal,
 } from "../state/agentPlanner";
 import type { OfficeWorkspace } from "../state/useOfficeWorkspace";
+import {
+  getHistoryLifecycle,
+  type HistoryEntry,
+} from "../state/workspaceHistory";
 
 interface Props {
   workspace: OfficeWorkspace;
@@ -23,6 +27,52 @@ interface Props {
 interface AgentMessage {
   role: "user" | "assistant" | "system";
   text: string;
+  transactionId?: string;
+}
+
+interface AgentMessageCardProps {
+  activeAgent: string;
+  entry?: HistoryEntry;
+  message: AgentMessage;
+  redoAvailable: boolean;
+  undoAvailable: boolean;
+}
+
+function AgentMessageCard({
+  activeAgent,
+  entry,
+  message,
+  redoAvailable,
+  undoAvailable,
+}: AgentMessageCardProps) {
+  const lifecycle = entry ? getHistoryLifecycle(entry) : null;
+  const heading = message.role === "user"
+    ? "You"
+    : message.role === "assistant"
+      ? activeAgent
+      : lifecycle === "reverted"
+        ? "Reverted"
+        : lifecycle === "re-applied"
+          ? "Re-applied"
+          : "Applied";
+
+  return (
+    <div
+      className="agent-message"
+      data-role={message.role}
+      data-state={lifecycle ?? undefined}
+    >
+      <strong>{heading}</strong>
+      <p>{message.text}</p>
+      {entry ? (
+        <span className="agent-transaction-state">
+          {entry.transaction.operations.length} operations
+          {redoAvailable ? " · ↻ Redo available" : null}
+          {undoAvailable ? " · ↶ Undo available" : null}
+        </span>
+      ) : null}
+    </div>
+  );
 }
 
 const AGENT_TABS = ["Claude", "Codex", "Cursor", "Shell"] as const;
@@ -39,6 +89,10 @@ export function AgentPane({ workspace }: Props) {
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [proposal, setProposal] = useState<AgentProposal | null>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
+  const historyByTransaction = useMemo(
+    () => new Map(workspace.history.map((entry) => [entry.transaction.id, entry])),
+    [workspace.history],
+  );
 
   useEffect(() => {
     terminalRef.current?.scrollTo({ top: terminalRef.current.scrollHeight, behavior: "smooth" });
@@ -64,10 +118,11 @@ export function AgentPane({ workspace }: Props) {
 
   const applyProposal = () => {
     if (!proposal) return;
-    workspace.applyAgentProposal(proposal, `${activeAgent} local planner`);
+    const transactionId = workspace.applyAgentProposal(proposal, `${activeAgent} local planner`);
     setMessages((items) => [...items, {
       role: "system",
-      text: `${proposal.title}を1 transactionとして適用した。Undoで全変更を戻せる。`,
+      text: proposal.title,
+      transactionId,
     }]);
     setProposal(null);
   };
@@ -120,12 +175,21 @@ export function AgentPane({ workspace }: Props) {
           </div>
         ) : null}
 
-        {messages.map((message, index) => (
-          <div className="agent-message" data-role={message.role} key={`${message.role}-${index}`}>
-            <strong>{message.role === "user" ? "You" : message.role === "system" ? "Applied" : activeAgent}</strong>
-            <p>{message.text}</p>
-          </div>
-        ))}
+        {messages.map((message, index) => {
+          const entry = message.transactionId
+            ? historyByTransaction.get(message.transactionId)
+            : undefined;
+          return (
+            <AgentMessageCard
+              activeAgent={activeAgent}
+              entry={entry}
+              key={message.transactionId ?? `${message.role}-${index}`}
+              message={message}
+              redoAvailable={workspace.nextRedoTransactionId === message.transactionId}
+              undoAvailable={workspace.nextUndoTransactionId === message.transactionId}
+            />
+          );
+        })}
 
         {proposal ? (
           <section className="agent-proposal" aria-label="Agent change proposal">
