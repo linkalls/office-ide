@@ -126,7 +126,10 @@ impl CodexHost {
             }
         }
 
-        emit(&app, CodexRuntimeEvent::phase("starting", "Starting Codex app-server"));
+        emit(
+            &app,
+            CodexRuntimeEvent::phase("starting", "Starting Codex app-server"),
+        );
 
         let mut child = Command::new("codex")
             .arg("app-server")
@@ -188,7 +191,10 @@ impl CodexHost {
 
         // The official lifecycle requires the initialize response before this notification.
         self.notify("initialized", json!({})).await?;
-        emit(&app, CodexRuntimeEvent::phase("ready", "Codex app-server ready"));
+        emit(
+            &app,
+            CodexRuntimeEvent::phase("ready", "Codex app-server ready"),
+        );
         Ok(initialize)
     }
 
@@ -233,7 +239,8 @@ impl CodexHost {
         id: Value,
         result: Value,
     ) -> Result<(), CodexHostError> {
-        self.write_message(json!({ "id": id, "result": result })).await
+        self.write_message(json!({ "id": id, "result": result }))
+            .await
     }
 
     pub async fn shutdown(&self) {
@@ -295,11 +302,7 @@ impl CodexHost {
         process.stdin.flush().await.map_err(CodexHostError::Write)
     }
 
-    fn spawn_stdout_reader(
-        &self,
-        app: AppHandle,
-        stdout: tokio::process::ChildStdout,
-    ) {
+    fn spawn_stdout_reader(&self, app: AppHandle, stdout: tokio::process::ChildStdout) {
         let shared = Arc::clone(&self.shared);
         tauri::async_runtime::spawn(async move {
             let mut lines = BufReader::new(stdout).lines();
@@ -333,11 +336,7 @@ impl CodexHost {
         });
     }
 
-    fn spawn_stderr_reader(
-        &self,
-        app: AppHandle,
-        stderr: tokio::process::ChildStderr,
-    ) {
+    fn spawn_stderr_reader(&self, app: AppHandle, stderr: tokio::process::ChildStderr) {
         tauri::async_runtime::spawn(async move {
             let mut lines = BufReader::new(stderr).lines();
             while let Ok(Some(line)) = lines.next_line().await {
