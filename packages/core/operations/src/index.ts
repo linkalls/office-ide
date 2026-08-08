@@ -18,6 +18,7 @@ type StructureMode = "insert" | "delete";
 
 const CELL_REFERENCE_PATTERN = /(\$?)([A-Z]+)(\$?)([1-9]\d*)/gi;
 const FORMULA_STRING_PATTERN = /("(?:[^"]|"")*")/g;
+let transactionSequence = 0;
 
 function rewriteFormulaReferences(
   formula: string,
@@ -435,7 +436,7 @@ export function createTransaction(
   actor: Actor = { type: "user" },
 ): Transaction {
   return {
-    id: crypto.randomUUID(),
+    id: `${crypto.randomUUID()}-${++transactionSequence}`,
     actor,
     timestamp: Date.now(),
     label,

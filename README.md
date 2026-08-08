@@ -6,11 +6,13 @@ Agent-first Office Suite。Spreadsheet / Document / Source / Git / Terminal / Ag
 
 ## Demo
 
-<video src="https://raw.githubusercontent.com/linkalls/office-ide/main/docs/media/office-ide-demo.mp4" poster="https://raw.githubusercontent.com/linkalls/office-ide/main/docs/images/office-ide-multi-sheet.png" controls width="100%"></video>
+<video src="https://raw.githubusercontent.com/linkalls/office-ide/main/docs/media/office-ide-agent-demo.mp4" poster="https://raw.githubusercontent.com/linkalls/office-ide/main/docs/images/office-ide-agent-review.png" controls width="100%"></video>
 
-[▶ 14秒のMP4デモを直接開く](docs/media/office-ide-demo.mp4)
+[▶ 18秒のAgent workflow MP4を直接開く](docs/media/office-ide-agent-demo.mp4)
 
-デモではsheet追加・改名、セルと数式の編集、autosave、ページ再読み込み後の復元、sheet削除とUndoを実際に操作しています。
+キーボードで数式を1文字ずつ入力し、自然言語の依頼から変更案を作成、適用前レビュー、4つのsemantic operationの一括適用、Agent attribution付きHistory、Undo / Redo、再起動後のautosave recoveryまで実際に操作しています。
+
+[▶ Multi-sheet / autosaveの14秒デモ](docs/media/office-ide-demo.mp4)
 
 現在の実装はPhase 0とPhase 1 Spreadsheet Coreの縦方向sliceを対象にしています。
 
@@ -28,12 +30,27 @@ Agent-first Office Suite。Spreadsheet / Document / Source / Git / Terminal / Ag
 - 四則演算、比較、参照、range、集計・論理・文字列・丸め関数、IF、循環参照検出を含むformula engine
 - 数式構文診断とGrid / Problemsへのエラー表示
 - GridとSourceの双方向更新デモ
-- Agent context pane、Diff、History、Problems、Terminal surface
+- review-first Agent workflow（自然言語 → proposal → semantic operations → apply）
+- Agent attribution付きHistory / Diffと、Agent変更全体のUndo / Redo
+- セルへの直接キーボード入力、Enter / Shift+Enter / Tab / Shift+Tabナビゲーション
+- Agent context pane、Problems、Terminal surface
 - command paletteとkeyboard shortcuts
+
+## AI workflow
+
+Agent paneへ `Add an average unit price formula to column G` または `G列に税込売上を追加して` と入力すると、現在のWorkbook IRを読んで変更案を作ります。提案された範囲・式・操作を確認してからApplyすると、すべてが1つのsemantic transactionとしてGrid、KDL Source、Diff、Historyへ反映されます。変更者はAgentとして記録され、Undo 1回で提案全体を戻せます。
+
+![自然言語から作成された適用前の変更案](docs/images/office-ide-agent-review.png)
+
+現在のplannerはPhase 2の安全な境界を先に検証するための決定的なlocal rule engineです。外部LLMやCodex CLIを呼んだように見せてはいません。実process / PTY / CLI接続は次のPhase 2実装です。
+
+![Agent提案を適用しG列へ式を展開した状態](docs/images/office-ide-agent-applied.png)
 
 ## Grid / Sourceの同期
 
 セルまたは数式バーへ入力し、Enterかフォーカス移動で確定すると、Spreadsheet IRを経由してKDL Sourceへ反映されます。数式セルを選び、Shiftクリックで範囲を広げて`Σ`を押すと、`$`付き絶対参照を維持したまま相対参照をフィルできます。変更全体は1 transactionなのでUndo / Redoも1回です。
+
+Gridのセルは通常のキーボード入力に対応しています。Enter / Shift+Enterで上下、Tab / Shift+Tabで左右へ確定しながら移動します。数式内の関数引数カンマは保持されるため、`=ROUND(10/3,2)`もそのまま`3.33`として評価されます。
 
 ![G2からG5へROUND式を相対フィルした状態](docs/images/office-ide-formula-fill.png)
 
@@ -70,5 +87,5 @@ bun run build
 2. KDL 2.0完全parserへ差し替え
 3. formula engineの日付・配列・sheet間参照とnamed style
 4. Tauri channel + `portable-pty`によるterminal接続
-5. `sheetctl`とlocal IPC
+5. Codex / Claude CLI launcher、`sheetctl`、local IPCをlocal plannerのproposal境界へ接続
 6. AST-preserving source patch

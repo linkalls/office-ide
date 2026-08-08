@@ -338,13 +338,34 @@ textarea:focus-visible {
 .agent-terminal { min-height: 0; overflow: auto; padding: 13px 13px 28px; color: #c4cfdb; font-size: 10.5px; line-height: 1.58; background: #0b131d; }
 .agent-terminal p { margin: 0 0 7px; }
 .terminal-heading { display: flex; align-items: center; gap: 7px; color: #60a5fa; font-family: Inter, sans-serif; font-size: 12px; font-weight: 700; margin-bottom: 13px; }
+.terminal-heading small { margin-left: auto; display: flex; align-items: center; gap: 4px; padding: 3px 6px; border: 1px solid #29553f; border-radius: 999px; color: #79d7a3; font-size: 8px; font-weight: 600; }
 .agent-line { display: flex; align-items: flex-start; gap: 3px; color: #b7c2cf; }
 .agent-line svg { flex: 0 0 auto; margin-top: 2px; color: #6b788b; }
 .agent-line.muted { color: #788699; }
 .agent-plan { margin: 13px 0 17px; padding: 10px; border-left: 2px solid var(--accent); background: #101c2a; color: #a9b6c5; }
 .agent-plan span { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; color: #76b7ff; font-family: Inter, sans-serif; font-weight: 700; }
 .agent-plan p { margin: 0; }
-.agent-message { margin: 13px 0; padding-top: 10px; border-top: 1px solid var(--border-soft); }
+.agent-message { margin: 11px 0; padding: 9px 10px; border: 1px solid var(--border-soft); border-radius: 5px; background: #0f1925; }
+.agent-message[data-role="user"] { margin-left: 18px; border-color: #244e79; background: #10243a; }
+.agent-message[data-role="system"] { border-color: #28523d; background: #10251c; }
+.agent-message strong { display: block; margin-bottom: 4px; color: #7dbbff; font: 700 9px Inter, sans-serif; }
+.agent-message[data-role="system"] strong { color: #79d7a3; }
+.agent-message p { margin: 0; color: #aebbc9; }
+.agent-suggestion { width: 100%; display: flex; align-items: center; gap: 7px; padding: 8px 9px; border: 1px dashed #315477; border-radius: 5px; color: #88bff7; background: #0e1b29; cursor: pointer; font-size: 9px; text-align: left; }
+.agent-suggestion:hover { border-style: solid; color: white; background: #14263a; }
+.agent-proposal { margin: 12px 0; padding: 11px; border: 1px solid #315b87; border-radius: 6px; background: linear-gradient(145deg, #112237, #0e1a28); box-shadow: inset 3px 0 0 var(--accent); }
+.proposal-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.proposal-heading span { display: flex; align-items: center; gap: 5px; color: #79baff; font: 700 10px Inter, sans-serif; }
+.proposal-heading code { padding: 2px 5px; border-radius: 3px; color: #9bc9ff; background: #0a1521; font-size: 8px; }
+.agent-proposal > strong { color: #e2eaf3; font: 700 10px Inter, sans-serif; }
+.agent-proposal > p { margin: 6px 0 8px; color: #9eacbc; line-height: 1.45; }
+.agent-proposal ol { margin: 0 0 10px; padding-left: 20px; color: #8999aa; font-size: 9px; line-height: 1.55; }
+.proposal-actions { display: flex; gap: 6px; }
+.proposal-actions button { height: 28px; display: flex; align-items: center; justify-content: center; gap: 5px; border-radius: 4px; cursor: pointer; font-size: 9px; }
+.proposal-apply { flex: 1; border: 1px solid #2f81f7; color: white; background: #236bc2; }
+.proposal-apply:hover { background: #2f81f7; }
+.proposal-dismiss { border: 1px solid #344357; color: #8f9cad; background: transparent; }
+.proposal-dismiss:hover { color: white; background: #1a2736; }
 .agent-composer { position: relative; margin: 8px 10px 10px; border: 1px solid #31445b; border-radius: 6px; background: #111c29; }
 .composer-label { height: 25px; display: flex; align-items: center; gap: 6px; padding: 0 9px; color: #718096; font-size: 9px; }
 .agent-composer textarea { width: 100%; height: 66px; resize: none; border: 0; padding: 8px 40px 8px 10px; outline: 0; color: #dbe3ec; background: transparent; font-size: 11px; }

@@ -31,10 +31,11 @@ interface CellInputProps {
   style: CSSProperties;
   onCommit: (value: string) => void;
   onSelect: (extend: boolean) => void;
+  onNavigate: (direction: "up" | "down" | "left" | "right") => void;
 }
 
 /** 計算結果の表示と、入力途中のformula draftを分離する。 */
-function CellInput({ address, rawValue, displayValue, style, onCommit, onSelect }: CellInputProps) {
+function CellInput({ address, rawValue, displayValue, style, onCommit, onSelect, onNavigate }: CellInputProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(rawValue);
   const cancelRef = useRef(false);
@@ -70,7 +71,14 @@ function CellInput({ address, rawValue, displayValue, style, onCommit, onSelect 
         if (draft !== rawValue) onCommit(draft);
       }}
       onKeyDown={(event) => {
-        if (event.key === "Enter") event.currentTarget.blur();
+        if (event.key === "Enter" || event.key === "Tab") {
+          event.preventDefault();
+          const direction = event.key === "Enter"
+            ? event.shiftKey ? "up" : "down"
+            : event.shiftKey ? "left" : "right";
+          event.currentTarget.blur();
+          window.requestAnimationFrame(() => onNavigate(direction));
+        }
         if (event.key === "Escape") {
           cancelRef.current = true;
           event.currentTarget.blur();
@@ -174,6 +182,29 @@ export function SpreadsheetGrid({ workspace }: Props) {
     return result;
   }, [calculated]);
 
+  const navigateFrom = (
+    address: string,
+    direction: "up" | "down" | "left" | "right",
+  ) => {
+    const match = address.match(/^([A-Z]+)([1-9]\d*)$/);
+    if (!match) return;
+    let columnIndex = COLUMNS.indexOf(match[1]);
+    let row = Number(match[2]);
+    if (direction === "up") row = Math.max(1, row - 1);
+    if (direction === "down") row = Math.min(ROWS.length, row + 1);
+    if (direction === "left") {
+      if (columnIndex > 0) columnIndex -= 1;
+      else if (row > 1) { columnIndex = COLUMNS.length - 1; row -= 1; }
+    }
+    if (direction === "right") {
+      if (columnIndex < COLUMNS.length - 1) columnIndex += 1;
+      else if (row < ROWS.length) { columnIndex = 0; row += 1; }
+    }
+    const nextAddress = `${COLUMNS[Math.max(0, columnIndex)]}${row}`;
+    workspace.selectCell(nextAddress);
+    document.querySelector<HTMLInputElement>(`input[aria-label="Cell ${nextAddress}"]`)?.focus();
+  };
+
   return (
     <div className="grid-viewport">
       <table className="spreadsheet-grid" aria-label="売上 spreadsheet">
@@ -250,7 +281,11 @@ export function SpreadsheetGrid({ workspace }: Props) {
                         textAlign: cell?.style?.horizontalAlign,
                       }}
                       onSelect={(extend) => workspace.selectCell(address, extend)}
-                      onCommit={(value) => workspace.applyCellEdit(address, value.replaceAll(",", ""))}
+                      onCommit={(value) => workspace.applyCellEdit(
+                        address,
+                        value.startsWith("=") ? value : value.replaceAll(",", ""),
+                      )}
+                      onNavigate={(direction) => navigateFrom(address, direction)}
                     />
                   </td>
                 );

@@ -115,4 +115,26 @@ page reload → version check → KDL parse + diagnostics → restored Workbook 
 
 Corrupt, unsupported-version, or invalid-KDL snapshots are ignored instead of entering runtime state. The active sheet ID is restored separately. This is a browser safety net for the current prototype, not the specification's final persistence layer; filesystem-backed workspace open/create/save/load through Tauri remains pending.
 
-The README demo is generated from the Playwright interaction flow at 1280×720 and encoded as a 14-second H.264 MP4. The recorded path covers sheet creation, inline rename, value/formula entry, autosave, full-page reload recovery, sheet switching, delete, and Undo.
+The original README demo is generated from the Playwright interaction flow at 1280×720 and encoded as a 14-second H.264 MP4. The recorded path covers sheet creation, inline rename, value/formula entry, autosave, full-page reload recovery, sheet switching, delete, and Undo.
+
+## Phase 2 review-first Agent slice
+
+The Agent pane now exercises the real proposal boundary before a CLI or LLM is attached:
+
+```text
+natural-language request
+  → deterministic local planner
+  → proposal with range + operation preview
+  → explicit user Apply
+  → one Agent-attributed transaction
+  → Workbook IR + KDL + Grid + History
+  → Undo / Redo
+```
+
+The planner currently recognizes average-unit-price and tax-included-sales requests in English or Japanese. It derives the last populated row from the active Workbook IR, writes a styled G1 header, seeds the G2 formula, and fills relative references through the data range. Unsupported prompts produce suggestions and no operations. This is deliberately labeled `Local planner`: it proves review, attribution, operation, and rollback semantics without pretending that a model or CLI process is connected.
+
+The 18-second Agent README demo records every input character rather than injecting finished strings. It verifies `=ROUND(10/3,2)` evaluates to `3.33`, Enter commits and moves to G18, an English Agent request creates a proposal, Apply changes G1:G15 as four semantic operations, History records `Agent · Codex local planner`, Undo/Redo treats the proposal atomically, and autosave restores the result after reload. The same browser run checks zero warning/error output and zero body overflow at desktop and compact viewports.
+
+## Keyboard editing slice
+
+Grid cells keep drafts while typing and now commit plus navigate with Enter, Shift+Enter, Tab, and Shift+Tab. Tab wraps to the neighboring row at the visible grid edge. Thousands separators are normalized only for literal values; formulas retain commas so multi-argument functions are not corrupted. Undo/Redo state transitions avoid nested React state-updater side effects, keeping History keys and redo entries unique under development Strict Mode.

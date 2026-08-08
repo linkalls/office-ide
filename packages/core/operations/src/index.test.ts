@@ -1,8 +1,18 @@
 import { describe, expect, test } from "bun:test";
 import { createEmptyWorkbook } from "@office-ide/spreadsheet-ir";
-import { applySpreadsheetOperations, translateFormulaReferences } from "./index";
+import {
+  applySpreadsheetOperations,
+  createTransaction,
+  translateFormulaReferences,
+} from "./index";
 
 describe("spreadsheet operations", () => {
+  test("creates unique transaction ids even if the runtime UUID source repeats", () => {
+    const first = createTransaction("First", []);
+    const second = createTransaction("Second", []);
+    expect(first.id).not.toBe(second.id);
+  });
+
   test("applies formatting without replacing cell content", () => {
     const workbook = createEmptyWorkbook();
     workbook.sheets[0]!.cells.A1 = { address: "A1", value: "Heading" };

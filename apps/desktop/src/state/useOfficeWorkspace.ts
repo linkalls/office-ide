@@ -22,6 +22,7 @@ import {
   loadWorkspaceSnapshot,
   saveWorkspaceSnapshot,
 } from "./workspacePersistence";
+import type { AgentProposal } from "./agentPlanner";
 
 export type WorkbenchView = EditorContext["activeView"];
 type StructureOperationType = Extract<SpreadsheetOperation, { at: number }>["type"];
@@ -289,6 +290,24 @@ export function useOfficeWorkspace() {
     setDiagnostics(getWorkbookDiagnostics(after));
   }, [activeCell, activeSheet.cells, activeSheet.id, canFillFormula, selection, selectionBounds, workbook]);
 
+  const applyAgentProposal = useCallback((proposal: AgentProposal, agent = "Codex") => {
+    const before = workbook;
+    const after = applySpreadsheetOperations(before, proposal.operations);
+    const transaction = createTransaction(
+      proposal.title,
+      proposal.operations,
+      { type: "agent", agent },
+    );
+    sourceUpdateOrigin.current = "visual";
+    setWorkbook(after);
+    setSource(serializeSpreadsheetSource(after));
+    setHistory((entries) => [...entries, { transaction, before, after }]);
+    setRedoStack([]);
+    setDiagnostics(getWorkbookDiagnostics(after));
+    setActiveCell(proposal.focusCell);
+    setSelection(proposal.selection);
+  }, [workbook]);
+
   const addSheet = useCallback(() => {
     const nextNumber = workbook.sheets.reduce((maximum, sheet) => {
       const match = sheet.id.match(/^sheet-(\d+)$/);
@@ -404,32 +423,28 @@ export function useOfficeWorkspace() {
   }, [workbook]);
 
   const undo = useCallback(() => {
-    setHistory((entries) => {
-      const latest = entries.at(-1);
-      if (!latest) return entries;
-      sourceUpdateOrigin.current = "visual";
-      setWorkbook(latest.before);
-      const nextSource = serializeSpreadsheetSource(latest.before);
-      setSource(nextSource);
-      setDiagnostics(parseSpreadsheetSource(nextSource).diagnostics);
-      setRedoStack((redoEntries) => [...redoEntries, latest]);
-      return entries.slice(0, -1);
-    });
-  }, []);
+    const latest = history.at(-1);
+    if (!latest) return;
+    sourceUpdateOrigin.current = "visual";
+    setWorkbook(latest.before);
+    const nextSource = serializeSpreadsheetSource(latest.before);
+    setSource(nextSource);
+    setDiagnostics(parseSpreadsheetSource(nextSource).diagnostics);
+    setRedoStack((entries) => [...entries, latest]);
+    setHistory(history.slice(0, -1));
+  }, [history]);
 
   const redo = useCallback(() => {
-    setRedoStack((entries) => {
-      const latest = entries.at(-1);
-      if (!latest) return entries;
-      sourceUpdateOrigin.current = "visual";
-      setWorkbook(latest.after);
-      const nextSource = serializeSpreadsheetSource(latest.after);
-      setSource(nextSource);
-      setDiagnostics(parseSpreadsheetSource(nextSource).diagnostics);
-      setHistory((historyEntries) => [...historyEntries, latest]);
-      return entries.slice(0, -1);
-    });
-  }, []);
+    const latest = redoStack.at(-1);
+    if (!latest) return;
+    sourceUpdateOrigin.current = "visual";
+    setWorkbook(latest.after);
+    const nextSource = serializeSpreadsheetSource(latest.after);
+    setSource(nextSource);
+    setDiagnostics(parseSpreadsheetSource(nextSource).diagnostics);
+    setHistory((entries) => [...entries, latest]);
+    setRedoStack(redoStack.slice(0, -1));
+  }, [redoStack]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -477,6 +492,7 @@ export function useOfficeWorkspace() {
     applyRowHeight,
     applySheetStructure,
     applyFormulaFill,
+    applyAgentProposal,
     addSheet,
     activateSheet,
     renameSheet,
