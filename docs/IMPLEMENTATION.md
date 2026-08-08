@@ -143,7 +143,7 @@ Grid cells keep drafts while typing and now commit plus navigate with Enter, Shi
 
 ## Locked Phase 2 Codex runtime contract
 
-The Codex runtime itself is not implemented yet. The implementation target is now fixed so a future UI cannot be mistaken for a working integration:
+The contract below is now represented by a first connection slice. It is not complete until it compiles and passes a signed-in desktop smoke against the installed Codex version:
 
 ```text
 React Chat / Activity
@@ -160,3 +160,23 @@ The two approval domains remain separate. A Codex command/sandbox/network approv
 Codex activity IDs (`threadId`, `turnId`, item ID) correlate execution; Office `transactionId` controls mutation state. Agent cards derive `Applied`, `Reverted`, and `Re-applied` from append-only History instead of storing their own boolean. Undo therefore preserves both the audit entry and card, marks the transaction `REVERTED`, and exposes Redo when available.
 
 Detailed process states, host commands, failure behavior, approval ownership, and acceptance criteria are specified in `docs/AGENT-RUNTIME.md`. Until those acceptance criteria pass against a real signed-in Codex installation, Phase 2 remains partial.
+
+## Phase 2 Codex app-server connection slice
+
+The first real connection slice now exists behind the Tauri boundary:
+
+```text
+AgentPane
+  ↕ useCodexRuntime + activity reducer
+typed Tauri commands / codex://event
+  ↕
+Rust CodexHost
+  ↕ JSONL stdio
+codex app-server
+```
+
+`CodexHost` owns one child process, stdin/stdout/stderr, monotonic request IDs, pending responses, request timeouts, initialize/initialized ordering, and shutdown. It emits explicit `starting`, `ready`, `error`, and `exited` phases. Invalid JSON and stderr become diagnostics instead of being interpreted as successful Agent output.
+
+The frontend reducer correlates thread, turn, and item IDs; merges streamed agent-message deltas into one card; treats `item/completed` as authoritative; and exposes server-initiated approvals only when the protocol actually requests them. Command/file approvals support Accept, Accept for session, Decline, and Cancel. Browser preview keeps the deterministic planner and labels it `Local planner`; only Tauri desktop attempts the real runtime.
+
+`bun run codex:schema` generates TypeScript and JSON Schema artifacts from the installed Codex CLI so the next adapter step can replace the current tolerant envelope types with version-matched generated types. This environment did not contain Codex or a Rust toolchain, so Rust compile, generated-schema diff, signed-in handshake, real turn streaming, and approval response smoke remain unverified.

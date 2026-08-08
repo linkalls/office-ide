@@ -1,7 +1,9 @@
 import {
   Bot,
+  CircleAlert,
   CheckCircle2,
   ChevronRight,
+  LoaderCircle,
   Send,
   Sheet,
   ShieldCheck,
@@ -19,6 +21,7 @@ import {
   getHistoryLifecycle,
   type HistoryEntry,
 } from "../state/workspaceHistory";
+import { useCodexRuntime } from "../state/useCodexRuntime";
 
 interface Props {
   workspace: OfficeWorkspace;
@@ -89,6 +92,11 @@ export function AgentPane({ workspace }: Props) {
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [proposal, setProposal] = useState<AgentProposal | null>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
+  const codexRuntime = useCodexRuntime();
+  const usesCodexRuntime = activeAgent === "Codex" && codexRuntime.isDesktop;
+  const runtimeBusy = usesCodexRuntime && (
+    codexRuntime.phase === "starting" || codexRuntime.phase === "running"
+  );
   const historyByTransaction = useMemo(
     () => new Map(workspace.history.map((entry) => [entry.transaction.id, entry])),
     [workspace.history],
@@ -96,11 +104,26 @@ export function AgentPane({ workspace }: Props) {
 
   useEffect(() => {
     terminalRef.current?.scrollTo({ top: terminalRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages.length, proposal?.id]);
+  }, [codexRuntime.activities.length, messages.length, proposal?.id]);
 
-  const submit = () => {
+  const submit = async () => {
     const clean = prompt.trim();
-    if (!clean) return;
+    if (!clean || runtimeBusy) return;
+    setPrompt("");
+
+    if (usesCodexRuntime) {
+      setMessages((items) => [...items, { role: "user", text: clean }]);
+      try {
+        await codexRuntime.sendPrompt(clean, ".");
+      } catch (error) {
+        setMessages((items) => [...items, {
+          role: "assistant",
+          text: error instanceof Error ? error.message : String(error),
+        }]);
+      }
+      return;
+    }
+
     const result = planAgentRequest(clean, workspace.workbook);
     setMessages((items) => [
       ...items,
@@ -113,7 +136,6 @@ export function AgentPane({ workspace }: Props) {
       },
     ]);
     setProposal(result.ok ? result.proposal : null);
-    setPrompt("");
   };
 
   const applyProposal = () => {
@@ -151,14 +173,85 @@ export function AgentPane({ workspace }: Props) {
       <div className="agent-terminal" aria-live="polite" ref={terminalRef}>
         <div className="terminal-heading">
           <Bot size={15} /> {activeAgent}
-          <small><ShieldCheck size={11} /> Local planner</small>
+          <small data-phase={usesCodexRuntime ? codexRuntime.phase : "local"}>
+            {runtimeBusy ? <LoaderCircle className="spin" size={11} /> : <ShieldCheck size={11} />}
+            {usesCodexRuntime ? codexRuntime.phase : "Local planner"}
+          </small>
         </div>
-        <p className="agent-line"><ChevronRight size={13} /> Workbook IR and KDL source attached</p>
+        <p className="agent-line">
+          <ChevronRight size={13} />
+          {usesCodexRuntime ? codexRuntime.statusMessage : "Workbook IR and KDL source attached"}
+        </p>
         <p className="agent-line"><ChevronRight size={13} /> Active context: {workspace.activeSheet.name}!{workspace.selection}</p>
         <div className="agent-plan">
-          <span><Sparkles size={14} /> Review-first agent workflow</span>
-          <p>依頼をsemantic operationsへ変換し、適用前に範囲と変更内容を確認できる。</p>
+          <span><Sparkles size={14} /> {usesCodexRuntime ? "Codex app-server" : "Review-first agent workflow"}</span>
+          <p>
+            {usesCodexRuntime
+              ? "実Codexのthread / turn / item eventを表示する。Office変更は別のProposal境界で止める。"
+              : "依頼をsemantic operationsへ変換し、適用前に範囲と変更内容を確認できる。"}
+          </p>
         </div>
+
+        {usesCodexRuntime ? codexRuntime.activities.map((activity) => (
+          <div
+            className="agent-activity"
+            data-kind={activity.kind}
+            data-status={activity.status}
+            key={activity.id}
+          >
+            <strong>{activity.title}</strong>
+            {activity.detail ? <p>{activity.detail}</p> : null}
+            <span>{activity.status}</span>
+          </div>
+        )) : null}
+
+        {usesCodexRuntime ? codexRuntime.pendingRequests.map((request) => {
+          const isDecisionApproval = request.method === "item/commandExecution/requestApproval"
+            || request.method === "item/fileChange/requestApproval";
+          return (
+            <section className="codex-approval" key={request.id}>
+              <strong><CircleAlert size={14} /> Codex request</strong>
+              <code>{request.method}</code>
+              <p>
+                {isDecisionApproval
+                  ? "これはCodex app-server自身が要求した承認。OfficeのApplyとは別物だ。"
+                  : "このserver requestはまだ専用フォーム未実装。誤った形式では応答しない。"}
+              </p>
+              {isDecisionApproval ? (
+                <div className="proposal-actions">
+                  <button
+                    type="button"
+                    className="proposal-apply"
+                    onClick={() => void codexRuntime.answerRequest(request.id, "accept")}
+                  >
+                    Accept
+                  </button>
+                  <button
+                    type="button"
+                    className="proposal-session"
+                    onClick={() => void codexRuntime.answerRequest(request.id, "acceptForSession")}
+                  >
+                    For session
+                  </button>
+                  <button
+                    type="button"
+                    className="proposal-dismiss"
+                    onClick={() => void codexRuntime.answerRequest(request.id, "decline")}
+                  >
+                    Decline
+                  </button>
+                  <button
+                    type="button"
+                    className="proposal-dismiss"
+                    onClick={() => void codexRuntime.answerRequest(request.id, "cancel")}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : null}
+            </section>
+          );
+        }) : null}
 
         {messages.length === 0 ? (
           <div className="agent-suggestions" aria-label="Agent prompt examples">
@@ -223,11 +316,18 @@ export function AgentPane({ workspace }: Props) {
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
-              submit();
+              void submit();
             }
           }}
         />
-        <button type="button" aria-label="Send prompt" onClick={submit}><Send size={16} /></button>
+        <button
+          type="button"
+          aria-label="Send prompt"
+          disabled={runtimeBusy}
+          onClick={() => void submit()}
+        >
+          {runtimeBusy ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />}
+        </button>
       </div>
     </aside>
   );

@@ -1,5 +1,15 @@
 # Agent runtime and approval boundaries
 
+## Implementation status (2026-08-09)
+
+The first Tauri connection slice is implemented in `apps/desktop/src-tauri/src/codex_host.rs`, `apps/desktop/src/state/codexRuntime.ts`, and `apps/desktop/src/state/useCodexRuntime.ts`.
+
+- Implemented: single Rust-owned child process, JSONL stdio, request routing, 20-second timeout, initialize → initialized ordering, thread/start, turn/start, stderr/protocol diagnostics, shutdown, normalized frontend event reducer, streamed Agent message merging, turn/error states, and four-way command/file approval decisions.
+- Preserved: browser preview is explicitly the local planner; desktop connection failures never silently masquerade as Codex success; Office semantic Apply remains separate from Codex runtime approval.
+- Verification still required on a desktop with Rust and signed-in Codex installed: Rust compile/tests, generated schema adoption, real initialize/thread/turn smoke, process-exit recovery, and actual approval round-trip.
+
+Generate the installed-CLI schemas with `bun run codex:schema` before tightening wire types.
+
 ## Product model
 
 ```text
@@ -127,9 +137,9 @@ Undo marks the original History entry `REVERTED`; it does not delete it. Redo ma
 
 ## Implementation order
 
-1. Rust Codex app-server stdio lifecycle and version-matched generated schema.
-2. Codex thread/turn/event/approval adapter.
-3. Structured activity bus shared by Chat and Terminal.
+1. Compile and smoke the implemented Rust stdio lifecycle against a signed-in Codex CLI.
+2. Generate version-matched schema and replace tolerant envelopes with generated wire types.
+3. Complete reconnect/resume and the structured activity bus shared by Chat and Activity.
 4. `xterm.js` plus Rust `portable-pty` for Claude/Cursor/Shell and raw terminal access.
 5. `sheetctl` local IPC with read-only context/range commands.
 6. Blocking semantic proposal handshake for mutating commands.

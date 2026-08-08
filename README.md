@@ -36,6 +36,7 @@ Agent-first Office Suite。Spreadsheet / Document / Source / Git / Terminal / Ag
 - append-onlyなAgent attribution付きHistory / Diffと、`REVERTED`状態を残すUndo / Redo
 - セルへの直接キーボード入力、Enter / Shift+Enter / Tab / Shift+Tabナビゲーション
 - Agent context pane、Problems、Terminal surface
+- Rust所有のCodex app-server JSONL host、thread/turn/item reducer、実server request由来の承認UI（desktop接続slice）
 - command paletteとkeyboard shortcuts
 
 ## AI workflow
@@ -56,7 +57,11 @@ Agent card自身も同じtransaction IDを購読します。lifecycleは`Proposa
 
 ![売上50万円以上の4行だけをAgentが抽出・強調した状態](docs/images/office-ide-agent-highlight.png)
 
-現在のplannerはPhase 2の安全な境界を先に検証するための決定的なlocal rule engineです。外部LLMやCodex CLIを呼んだように見せてはいません。実process / PTY / CLI接続は次のPhase 2実装です。
+ブラウザpreviewのplannerはPhase 2の安全な境界を検証するための決定的なlocal rule engineです。外部LLMやCodex CLIを呼んだように見せてはいません。実process接続はTauri desktop専用の次項へ分離しています。
+
+Tauri desktopではCodex tabがRust host経由で`codex app-server`へ接続する最初のsliceを持ちます。Rust backendが単一process、JSONL stdio、request ID、timeout、shutdownを所有し、frontendは`thread/*`、`turn/*`、`item/*`、server-initiated approvalをevent reducerへ投影します。Codex未install、未login、handshake失敗はerrorとして表示し、local plannerへ黙ってfallbackしません。ブラウザpreviewは引き続き`Local planner`と明示します。
+
+この接続sliceはCodex CLIとRust toolchainが入ったdesktop環境でのcompile/smokeがまだ必要です。wire schemaはインストール済みCLIに合わせて生成します。
 
 ## Grid / Sourceの同期
 
@@ -83,6 +88,12 @@ Desktop shellを起動する場合：
 
 ```bash
 bun run tauri dev
+```
+
+Codex app-serverのversion-matched TypeScript / JSON Schemaを生成する場合：
+
+```bash
+bun run codex:schema
 ```
 
 ## 検証
