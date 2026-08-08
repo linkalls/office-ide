@@ -351,7 +351,8 @@ textarea:focus-visible {
 .agent-message strong { display: block; margin-bottom: 4px; color: #7dbbff; font: 700 9px Inter, sans-serif; }
 .agent-message[data-role="system"] strong { color: #79d7a3; }
 .agent-message p { margin: 0; color: #aebbc9; }
-.agent-suggestion { width: 100%; display: flex; align-items: center; gap: 7px; padding: 8px 9px; border: 1px dashed #315477; border-radius: 5px; color: #88bff7; background: #0e1b29; cursor: pointer; font-size: 9px; text-align: left; }
+.agent-suggestions { display: grid; gap: 5px; }
+.agent-suggestion { width: 100%; display: flex; align-items: center; gap: 7px; padding: 7px 9px; border: 1px dashed #315477; border-radius: 5px; color: #88bff7; background: #0e1b29; cursor: pointer; font-size: 9px; text-align: left; }
 .agent-suggestion:hover { border-style: solid; color: white; background: #14263a; }
 .agent-proposal { margin: 12px 0; padding: 11px; border: 1px solid #315b87; border-radius: 6px; background: linear-gradient(145deg, #112237, #0e1a28); box-shadow: inset 3px 0 0 var(--accent); }
 .proposal-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }

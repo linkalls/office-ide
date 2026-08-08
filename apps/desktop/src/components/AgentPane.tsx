@@ -26,7 +26,11 @@ interface AgentMessage {
 }
 
 const AGENT_TABS = ["Claude", "Codex", "Cursor", "Shell"] as const;
-const DEFAULT_SUGGESTION = "Add an average unit price formula to column G";
+const AGENT_SUGGESTIONS = [
+  "Add an average unit price formula to column G",
+  "G列に税込売上を追加して",
+  "売上50万円以上を強調して",
+] as const;
 
 export function AgentPane({ workspace }: Props) {
   const [activeAgent, setActiveAgent] = useState<(typeof AGENT_TABS)[number]>("Codex");
@@ -101,13 +105,18 @@ export function AgentPane({ workspace }: Props) {
         </div>
 
         {messages.length === 0 ? (
-          <button
-            type="button"
-            className="agent-suggestion"
-            onClick={() => setPrompt(DEFAULT_SUGGESTION)}
-          >
-            <Sparkles size={13} /> {DEFAULT_SUGGESTION}
-          </button>
+          <div className="agent-suggestions" aria-label="Agent prompt examples">
+            {AGENT_SUGGESTIONS.map((suggestion) => (
+              <button
+                type="button"
+                className="agent-suggestion"
+                key={suggestion}
+                onClick={() => setPrompt(suggestion)}
+              >
+                <Sparkles size={13} /> {suggestion}
+              </button>
+            ))}
+          </div>
         ) : null}
 
         {messages.map((message, index) => (

@@ -38,11 +38,32 @@ describe("local agent planner", () => {
     });
   });
 
+  test("inspects workbook values and highlights only rows above a Japanese threshold", () => {
+    const workbook = createSalesWorkbook();
+    const result = planAgentRequest("売上0.095万円以上を強調して", workbook);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.proposal.focusCell).toBe("C2");
+    expect(result.proposal.operations).toHaveLength(6);
+
+    const changed = applySpreadsheetOperations(workbook, result.proposal.operations);
+    expect(changed.sheets[0]?.cells.A2?.style?.background).toBe("#6b4508");
+    expect(changed.sheets[0]?.cells.C2?.style?.bold).toBe(true);
+    expect(changed.sheets[0]?.cells.C3?.style).toBeUndefined();
+  });
+
+  test("refuses highlight requests with no matching rows", () => {
+    const result = planAgentRequest("Highlight sales above 500000", createSalesWorkbook());
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.message).toContain("見つからなかった");
+  });
+
   test("refuses unsupported requests without producing operations", () => {
     const result = planAgentRequest("Make it beautiful somehow", createSalesWorkbook());
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.message).toContain("変更は行っていない");
-    expect(result.suggestions).toHaveLength(2);
+    expect(result.suggestions).toHaveLength(3);
   });
 });

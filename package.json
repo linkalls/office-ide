@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "bun --cwd apps/desktop dev",
     "build": "bun --cwd apps/desktop build",
+    "demo:record": "bun scripts/record-agent-demo.ts",
     "test": "bun test",
     "typecheck": "bun --cwd apps/desktop typecheck",
     "tauri": "bun --cwd apps/desktop tauri"

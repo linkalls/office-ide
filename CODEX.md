@@ -38,7 +38,7 @@ history / undo / redo
 | --- | --- | --- | --- |
 | Phase 0 — Foundation | 🟡 | Bun monorepo、React/Vite shell、Tauri 2/Rustの雛形、Explorer、tabs、command palette、resource-neutralなeditor shell、browser local autosave/recovery | 実workspace directoryの作成/読込/保存、Tauri commandの実接続、Rust toolchain上でのdesktop起動確認 |
 | Phase 1 — Spreadsheet Core | 🟡 | Spreadsheet IR、stable sheet ID、複数sheet lifecycle、KDL MVP parser/serializer、Grid/Source双方向更新、draft確定型cell/formula編集、Shift range選択、相対数式フィル、cell style、row/columnのsize・複数挿入・削除semantic operation、A1数式参照shift、基本数式engine、構文診断、version付きautosave、基本transaction、Undo/Redo | Univer Sheets、Excel互換の完全な数式計算、named style、ドラッグ選択、AST-preserving patch、filesystem永続化、完全なKDL 2.0 |
-| Phase 2 — Agent Infrastructure | 🟡 | Agent pane、Claude/Codex/Cursor/Shell tabs、context表示、平均単価/税込列のlocal planner、proposal review、semantic operation一括適用、Agent attribution、History/Diff、Undo/Redo | 実LLM/CLI接続、xterm.js、portable-pty、CLI launcher、sheetctl、local IPC、Skills、完全なsemantic diff |
+| Phase 2 — Agent Infrastructure | 🟡 | Agent pane、Claude/Codex/Cursor/Shell tabs、context表示、平均単価/税込列/売上しきい値強調のlocal planner、Workbook値走査、proposal review、semantic operation一括適用、Agent attribution、History/Diff、Undo/Redo | 実LLM/CLI接続、xterm.js、portable-pty、CLI launcher、sheetctl、local IPC、Skills、完全なsemantic diff |
 | Phase 3 — XLSX | ⬜ | なし | importer/exporter、compatibility report、opaque OOXML preservation |
 | Phase 4 — Document Core | ⬜ | Explorer上のdocument見本のみ | Univer Docs、Document IR、Djot、layout KDL、双方向同期、docctl、Document Skill |
 | Phase 5 — DOCX | ⬜ | なし | importer/exporter、compatibility report、opaque OOXML preservation |
@@ -50,7 +50,7 @@ history / undo / redo
 | --- | --- | --- |
 | Spreadsheet | sample KDLの表示、複数sheetの作成/切替/改名/削除、セル値/式、Shift range選択・相対数式フィル、四則演算・比較・参照・range・集計/論理/文字列/丸め関数、数式エラー診断、bold/italic/color/alignment、row/columnのsize・複数挿入・削除、Sourceとの双方向反映、browser autosave/recovery、Undo/Redo | Univer描画、Excel互換の完全な式評価、named style、ドラッグ選択、sheet間参照、filesystem save/load |
 | Document | IDE shell内のresource表現 | Djot/Visual editor、Document IR、同期、履歴、保存 |
-| Agent | pane、tab、context bar、自然言語2レシピのlocal planning、適用前proposal review、Agent transaction、History attribution、Undo/Redo | 外部LLM/Agent process起動、PTY、任意prompt、sheetctl/docctl、Skill実行 |
+| Agent | pane、tab、context bar、自然言語3レシピのlocal planning、現在値に応じた行抽出、適用前proposal review、Agent transaction、History attribution、Undo/Redo | 外部LLM/Agent process起動、PTY、任意prompt、sheetctl/docctl、Skill実行 |
 | IDE | Explorer、editor tabs、command palette、Source/Diff/History/Problems/Terminal view、responsive layout | quick open、global search、実terminal、実Git、autosave/recovery、Light/System theme |
 | Compatibility | なし | XLSX/DOCX import/exportとunsupported feature report |
 
@@ -75,6 +75,7 @@ history / undo / redo
 | `apps/desktop/src/state/useOfficeWorkspace.ts` | UI state、source parse debounce、cell edit、history、Undo/Redo |
 | `apps/desktop/src/state/workspacePersistence.ts` | version付きKDL snapshotのautosave/recovery |
 | `apps/desktop/src/state/agentPlanner.ts` | local natural-language plannerとreview可能なAgent proposal |
+| `scripts/record-agent-demo.ts` | 大型カーソル・軌跡・字幕・クリック波紋付きREADME動画の再現可能な収録/QA |
 | `apps/desktop/src/components/SpreadsheetEditor.tsx` | Spreadsheet editorの交換境界 |
 | `apps/desktop/src/components/SpreadsheetGrid.tsx` | 現在の自作grid adapter |
 | `apps/desktop/src/components/WorkbenchPanel.tsx` | Source/Diff/History/Problems/Terminal views |
@@ -116,9 +117,10 @@ bun run build
 直近の検証結果:
 
 - TypeScript typecheck: pass
-- Bun tests: 33 passed / 0 failed
+- Bun tests: 35 passed / 0 failed
 - Vite production build: pass
-- Browser QA: 文字単位の数式/Agent prompt入力、proposal review、4 operations適用、Agent History、Undo/Redo、reload recoveryがpass。1440×900と980×760でbody overflowなし、console warning/errorなし
+- Browser QA: 文字単位の数式/Agent prompt入力、proposal review、4 operations適用、Agent History、Undo/Redo、reload recoveryがpass。売上50万円以上の4行を検出し24 operations適用/Undoもpass。1440×900と980×760でbody overflowなし、console warning/errorなし
+- README media QA: 38.2秒/382 frames。大型カーソルの各target到達を座標検証し、MP4全体をffmpegで再デコード済み
 - Rust/Tauri compile: 未確認（検証環境にRust toolchainなし）
 
 ## 6. 次に実装する順序
@@ -171,8 +173,8 @@ bun run tauri dev
 - named style、継承、border、number-format rendererは未実装。
 - version付きbrowser autosave/recoveryはあるが、filesystem persistenceとworkspace pickerは未実装。
 - UIはdark themeのみ。
-- Agent plannerは平均単価/税込売上の2レシピに限定した決定的rule engineで、LLMや実CLIではない。
-- unit testsはformula/sheet-source/operations/persistence/agent-plannerの33件。Playwright smoke QAとREADME demo動画生成は手動実行で、正式なintegration/visual regression suiteは未整備。
+- Agent plannerは平均単価/税込売上/売上しきい値強調の3レシピに限定した決定的rule engineで、LLMや実CLIではない。
+- unit testsはformula/sheet-source/operations/persistence/agent-plannerの35件。Playwright smoke QAは手動実行で、README demoは`bun run demo:record`で再生成できる。正式なintegration/visual regression suiteは未整備。
 
 ## 9. Codexへの作業ルール
 
