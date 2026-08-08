@@ -62,4 +62,17 @@ The selected row height and column width use the same semantic path:
 toolbar input → set-row-height / set-column-width → Spreadsheet IR → KDL → grid
 ```
 
-KDL uses `column "B" width=24` and `row 2 height=40`. Invalid non-positive dimensions produce diagnostics. Both visual edits and source edits round-trip, and snapshot history makes the changes undoable and redoable. Row/column insertion, deletion, and drag handles remain pending.
+KDL uses `column "B" width=24` and `row 2 height=40`. Invalid non-positive dimensions produce diagnostics. Both visual edits and source edits round-trip, and snapshot history makes the changes undoable and redoable. Drag handles remain pending.
+
+## Phase 1 structural editing slice
+
+The toolbar can insert or delete the active row and column through semantic operations:
+
+```text
++R / −R / +C / −C
+  → insert/delete operation
+  → shift cell addresses, dimensions, and A1 formula references
+  → Spreadsheet IR → KDL → grid
+```
+
+The transformer supports base-26 columns such as `Z` and `AA`, preserves `$` markers in absolute references, emits `#REF!` for direct references to deleted cells, and rejects invalid positions. Snapshot history keeps all four operations undoable. Multi-row/column commands, range-selection UX, and Excel-complete formula rewrite semantics remain pending.

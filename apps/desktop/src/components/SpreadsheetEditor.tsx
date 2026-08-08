@@ -23,6 +23,9 @@ export function SpreadsheetEditor({ workspace }: Props) {
   const formulaValue = cell?.formula ? `=${cell.formula}` : String(cell?.value ?? "");
   const [, activeColumn = "A", activeRowText = "1"] = workspace.activeCell.match(/^([A-Z]+)(\d+)$/) ?? [];
   const activeRow = Number(activeRowText);
+  const activeColumnIndex = activeColumn
+    .split("")
+    .reduce((index, character) => index * 26 + character.charCodeAt(0) - 64, 0);
   const columnWidth = workspace.activeSheet.columnWidths[activeColumn] ?? 14;
   const rowHeight = workspace.activeSheet.rowHeights[activeRow] ?? 25;
 
@@ -79,6 +82,45 @@ export function SpreadsheetEditor({ workspace }: Props) {
             onChange={(event) => workspace.applyRowHeight(activeRow, Number(event.target.value))}
           />
         </label>
+        <span className="toolbar-divider" />
+        <div className="structure-controls" role="group" aria-label="Row and column structure">
+          <button
+            className="structure-button"
+            type="button"
+            aria-label={`Insert row before ${activeRow}`}
+            title="Insert row"
+            onClick={() => workspace.applySheetStructure("insert-rows", activeRow)}
+          >
+            +R
+          </button>
+          <button
+            className="structure-button"
+            type="button"
+            aria-label={`Delete row ${activeRow}`}
+            title="Delete row"
+            onClick={() => workspace.applySheetStructure("delete-rows", activeRow)}
+          >
+            −R
+          </button>
+          <button
+            className="structure-button"
+            type="button"
+            aria-label={`Insert column before ${activeColumn}`}
+            title="Insert column"
+            onClick={() => workspace.applySheetStructure("insert-columns", activeColumnIndex)}
+          >
+            +C
+          </button>
+          <button
+            className="structure-button"
+            type="button"
+            aria-label={`Delete column ${activeColumn}`}
+            title="Delete column"
+            onClick={() => workspace.applySheetStructure("delete-columns", activeColumnIndex)}
+          >
+            −C
+          </button>
+        </div>
         <span className="toolbar-spacer" />
         <button className="toolbar-button" type="button"><Search size={15} /></button>
       </div>

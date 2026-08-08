@@ -230,7 +230,8 @@ textarea:focus-visible {
 .name-box { height: 27px; width: 92px; display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--border); border-radius: 4px; padding: 0 8px; background: #0c141f; color: #c5ceda; font-size: 11px; }
 .formula-symbol { width: 36px; text-align: center; color: #6f7d90; font-family: Georgia, serif; font-style: italic; }
 .formula-input { flex: 1; height: 27px; border: 1px solid var(--border); border-radius: 4px; padding: 0 9px; color: #d8e0e9; background: #0c141f; font-size: 11px; }
-.format-toolbar { display: flex; align-items: center; gap: 2px; padding: 4px 8px; border-bottom: 1px solid var(--border); background: #111a27; }
+.format-toolbar { display: flex; align-items: center; gap: 2px; overflow-x: auto; padding: 4px 8px; border-bottom: 1px solid var(--border); background: #111a27; scrollbar-width: none; }
+.format-toolbar::-webkit-scrollbar { display: none; }
 .toolbar-button, .toolbar-select { height: 27px; border: 0; border-radius: 4px; background: transparent; color: #aeb9c7; cursor: pointer; font-size: 11px; }
 .toolbar-button { width: 29px; display: grid; place-items: center; }
 .toolbar-button:hover, .toolbar-select:hover { background: var(--hover); color: white; }
@@ -242,6 +243,9 @@ textarea:focus-visible {
 .toolbar-spacer { flex: 1; }
 .dimension-control { height: 27px; display: flex; align-items: center; gap: 4px; padding: 0 5px; border: 1px solid var(--border); border-radius: 4px; color: #728198; font-size: 9px; }
 .dimension-control input { width: 36px; border: 0; outline: 0; padding: 0; color: #cbd5e1; background: transparent; font-size: 10px; font-variant-numeric: tabular-nums; }
+.structure-controls { display: flex; flex: 0 0 auto; gap: 2px; }
+.structure-button { width: 29px; height: 27px; border: 0; border-radius: 4px; color: #9dafc4; background: transparent; cursor: pointer; font-size: 9px; font-weight: 700; }
+.structure-button:hover { color: white; background: var(--hover); }
 .editor-work-area { min-height: 0; display: grid; grid-template-rows: minmax(280px, 62%) minmax(170px, 38%); }
 
 .grid-viewport { min-width: 0; min-height: 0; overflow: auto; position: relative; background: #0d1520; display: grid; grid-template-rows: minmax(max-content, 1fr) 30px; }

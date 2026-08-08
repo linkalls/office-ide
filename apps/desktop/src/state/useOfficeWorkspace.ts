@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   applySpreadsheetOperations,
   createTransaction,
+  type SpreadsheetOperation,
   type Transaction,
 } from "@office-ide/operations";
 import type { Diagnostic, EditorContext } from "@office-ide/protocol";
@@ -18,6 +19,7 @@ import {
 import { SAMPLE_SHEET_SOURCE } from "../data/sampleSource";
 
 export type WorkbenchView = EditorContext["activeView"];
+type StructureOperationType = Extract<SpreadsheetOperation, { at: number }>["type"];
 
 interface HistoryEntry {
   transaction: Transaction;
@@ -149,6 +151,33 @@ export function useOfficeWorkspace() {
     [activeSheet.id, workbook],
   );
 
+  const applySheetStructure = useCallback(
+    (type: StructureOperationType, at: number) => {
+      const before = workbook;
+      const operation = {
+        type,
+        sheetId: activeSheet.id,
+        at,
+        count: 1,
+      } as Extract<SpreadsheetOperation, { at: number }>;
+      const after = applySpreadsheetOperations(before, [operation]);
+      const labels: Record<StructureOperationType, string> = {
+        "insert-rows": `Inserted row ${at}`,
+        "delete-rows": `Deleted row ${at}`,
+        "insert-columns": `Inserted column ${at}`,
+        "delete-columns": `Deleted column ${at}`,
+      };
+      const transaction = createTransaction(labels[type], [operation]);
+      sourceUpdateOrigin.current = "visual";
+      setWorkbook(after);
+      setSource(serializeSpreadsheetSource(after));
+      setHistory((entries) => [...entries, { transaction, before, after }]);
+      setRedoStack([]);
+      setDiagnostics([]);
+    },
+    [activeSheet.id, workbook],
+  );
+
   useEffect(() => {
     if (sourceUpdateOrigin.current !== "source") return;
     const timer = window.setTimeout(() => {
@@ -233,6 +262,7 @@ export function useOfficeWorkspace() {
     applyCellStyle,
     applyColumnWidth,
     applyRowHeight,
+    applySheetStructure,
     editSource,
     undo,
     redo,
