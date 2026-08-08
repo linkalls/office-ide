@@ -58,4 +58,11 @@ describe("spreadsheet source", () => {
     const result = parseSpreadsheetSource(SOURCE.replace("width=20", "width=0"));
     expect(result.diagnostics[0]?.code).toBe("COLUMN_WIDTH");
   });
+
+  test("reports invalid formula syntax without discarding the workbook", () => {
+    const result = parseSpreadsheetSource(SOURCE.replace('formula="B2*2"', 'formula="SUM(B2"'));
+    expect(result.workbook).not.toBeNull();
+    expect(result.diagnostics[0]?.code).toBe("FORMULA_ERROR");
+    expect(result.diagnostics[0]?.message).toContain("売上!C2");
+  });
 });

@@ -76,3 +76,17 @@ The toolbar can insert or delete the active row and column through semantic oper
 ```
 
 The transformer supports base-26 columns such as `Z` and `AA`, preserves `$` markers in absolute references, emits `#REF!` for direct references to deleted cells, and rejects invalid positions. Snapshot history keeps all four operations undoable. Multi-row/column commands, range-selection UX, and Excel-complete formula rewrite semantics remain pending.
+
+## Phase 1 formula engine slice
+
+Formula evaluation is isolated in `@office-ide/formula` and consumes Spreadsheet IR directly:
+
+```text
+KDL formula → Spreadsheet IR → parser/evaluator → calculated Grid value
+                                      ↓
+                           Source / Problems diagnostics
+```
+
+The first slice supports arithmetic and exponentiation, parentheses and unary operators, comparisons, string concatenation, booleans, cell/range references, and `SUM`, `COUNT`, `AVERAGE`, `MIN`, `MAX`, and lazy `IF`. Recursive references are cached; circular references and common spreadsheet errors render as `#CYCLE!`, `#REF!`, `#DIV/0!`, `#VALUE!`, `#NAME?`, or `#ERROR!`. Malformed formulas remain in the IR/source, appear as an error in the Grid and Problems view, and Undo restores both the previous formula and diagnostics state.
+
+This is intentionally an Excel-like subset, not an Excel-complete engine. Date/time functions, arrays, named ranges, cross-sheet references, locale-specific syntax, and the larger function catalog remain pending.

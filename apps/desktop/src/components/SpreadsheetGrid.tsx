@@ -1,5 +1,9 @@
 import { useMemo, type CSSProperties } from "react";
-import type { SpreadsheetCell } from "@office-ide/spreadsheet-ir";
+import {
+  calculateSheet,
+  isCalculatedError,
+  type FormulaValue,
+} from "@office-ide/formula";
 import type { OfficeWorkspace } from "../state/useOfficeWorkspace";
 
 interface Props {
@@ -13,48 +17,28 @@ function columnToIndex(column: string): number {
   return column.charCodeAt(0) - 64;
 }
 
-function evaluateFormula(
-  formula: string,
-  cells: Record<string, SpreadsheetCell>,
-): number | string {
-  const match = formula.match(/^SUM\(([A-Z])(\d+):([A-Z])(\d+)\)$/i);
-  if (!match) return `=${formula}`;
-  const [, startColumn, startRowText, endColumn, endRowText] = match;
-  if (startColumn !== endColumn) return `=${formula}`;
-  let total = 0;
-  for (let row = Number(startRowText); row <= Number(endRowText); row += 1) {
-    const value = cells[`${startColumn.toUpperCase()}${row}`]?.value;
-    if (typeof value === "number") total += value;
-  }
-  return total;
-}
-
-function formatCell(cell: SpreadsheetCell | undefined): string {
-  if (!cell) return "";
-  const computed = cell.formula ? evaluateFormula(cell.formula, {}) : cell.value;
-  const displayValue = cell.formula ? computed : cell.value;
-  if (typeof displayValue === "number") return displayValue.toLocaleString("ja-JP");
-  return String(displayValue ?? "");
+function formatCell(value: FormulaValue | undefined): string {
+  if (typeof value === "number") return value.toLocaleString("ja-JP");
+  if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+  return String(value ?? "");
 }
 
 export function SpreadsheetGrid({ workspace }: Props) {
   const cells = workspace.activeSheet.cells;
+  const calculated = useMemo(
+    () => calculateSheet(workspace.activeSheet),
+    [workspace.activeSheet],
+  );
   const rendered = useMemo(() => {
     const result = new Map<string, string>();
     for (const row of ROWS) {
       for (const column of COLUMNS) {
         const address = `${column}${row}`;
-        const cell = cells[address];
-        if (cell?.formula) {
-          const evaluated = evaluateFormula(cell.formula, cells);
-          result.set(address, typeof evaluated === "number" ? evaluated.toLocaleString("ja-JP") : evaluated);
-        } else {
-          result.set(address, formatCell(cell));
-        }
+        result.set(address, formatCell(calculated[address]));
       }
     }
     return result;
-  }, [cells]);
+  }, [calculated]);
 
   return (
     <div className="grid-viewport">
@@ -103,6 +87,7 @@ export function SpreadsheetGrid({ workspace }: Props) {
                   <td
                     key={address}
                     data-active={workspace.activeCell === address}
+                    data-formula-error={isCalculatedError(calculated[address])}
                     data-header={isHeader}
                     data-total={isTotal}
                     style={{

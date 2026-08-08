@@ -16,6 +16,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@fontsource-variable/noto-sans-jp": "^5.3.0",
+        "@office-ide/formula": "workspace:*",
         "@office-ide/operations": "workspace:*",
         "@office-ide/protocol": "workspace:*",
         "@office-ide/sheet-source": "workspace:*",
@@ -50,6 +51,13 @@
       "name": "@office-ide/spreadsheet-ir",
       "version": "0.1.0",
     },
+    "packages/formula": {
+      "name": "@office-ide/formula",
+      "version": "0.1.0",
+      "dependencies": {
+        "@office-ide/spreadsheet-ir": "workspace:*",
+      },
+    },
     "packages/kdl": {
       "name": "@office-ide/kdl",
       "version": "0.1.0",
@@ -58,6 +66,7 @@
       "name": "@office-ide/sheet-source",
       "version": "0.1.0",
       "dependencies": {
+        "@office-ide/formula": "workspace:*",
         "@office-ide/kdl": "workspace:*",
         "@office-ide/protocol": "workspace:*",
         "@office-ide/spreadsheet-ir": "workspace:*",
@@ -170,6 +179,8 @@
     "@napi-rs/lzma-linux-x64-gnu": ["@napi-rs/lzma-linux-x64-gnu@1.5.1", "", { "os": "linux", "cpu": "x64" }, "sha512-oTXEIha4SsuXdTA4Iyskj0kpdx2yVXdhd75c2v3xGrHFfVMsbhTPZU/nMPL4sWKo4pBHm3aucLaqGlF696dTyQ=="],
 
     "@office-ide/desktop": ["@office-ide/desktop@workspace:apps/desktop"],
+
+    "@office-ide/formula": ["@office-ide/formula@workspace:packages/formula"],
 
     "@office-ide/kdl": ["@office-ide/kdl@workspace:packages/kdl"],
 

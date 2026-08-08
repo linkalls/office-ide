@@ -4,6 +4,7 @@
   "type": "module",
   "exports": "./src/index.ts",
   "dependencies": {
+    "@office-ide/formula": "workspace:*",
     "@office-ide/kdl": "workspace:*",
     "@office-ide/protocol": "workspace:*",
     "@office-ide/spreadsheet-ir": "workspace:*"

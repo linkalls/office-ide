@@ -1,4 +1,5 @@
 import { findKdlChildren, parseKdl } from "@office-ide/kdl";
+import { validateFormula } from "@office-ide/formula";
 import type { Diagnostic } from "@office-ide/protocol";
 import {
   createEmptyWorkbook,
@@ -170,6 +171,20 @@ export function parseSpreadsheetSource(source: string): SheetSourceParseResult {
   }
 
   workbook.activeSheetId = workbook.sheets[0]?.id ?? "sheet-1";
+
+  for (const sheet of workbook.sheets) {
+    for (const cell of Object.values(sheet.cells)) {
+      if (!cell.formula) continue;
+      const formulaError = validateFormula(cell.formula);
+      if (!formulaError) continue;
+      diagnostics.push({
+        severity: "error",
+        code: "FORMULA_ERROR",
+        message: `${sheet.name}!${cell.address}: ${formulaError}`,
+      });
+    }
+  }
+
   return { workbook, diagnostics };
 }
 

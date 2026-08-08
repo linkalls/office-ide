@@ -31,6 +31,10 @@ const initialParse = parseSpreadsheetSource(SAMPLE_SHEET_SOURCE);
 if (!initialParse.workbook) throw new Error("Bundled spreadsheet source is invalid");
 const initialWorkbook = initialParse.workbook;
 
+function getWorkbookDiagnostics(workbook: SpreadsheetWorkbook): Diagnostic[] {
+  return parseSpreadsheetSource(serializeSpreadsheetSource(workbook)).diagnostics;
+}
+
 export function useOfficeWorkspace() {
   const [workbook, setWorkbook] = useState<SpreadsheetWorkbook>(initialWorkbook);
   const [source, setSource] = useState(SAMPLE_SHEET_SOURCE);
@@ -74,7 +78,7 @@ export function useOfficeWorkspace() {
       setSource(serializeSpreadsheetSource(after));
       setHistory((entries) => [...entries, { transaction, before, after }]);
       setRedoStack([]);
-      setDiagnostics([]);
+      setDiagnostics(getWorkbookDiagnostics(after));
       setActiveCell(address);
       setSelection(address);
     },
@@ -102,7 +106,7 @@ export function useOfficeWorkspace() {
       setSource(serializeSpreadsheetSource(after));
       setHistory((entries) => [...entries, { transaction, before, after }]);
       setRedoStack([]);
-      setDiagnostics([]);
+      setDiagnostics(getWorkbookDiagnostics(after));
     },
     [activeCell, activeSheet.id, workbook],
   );
@@ -124,7 +128,7 @@ export function useOfficeWorkspace() {
       setSource(serializeSpreadsheetSource(after));
       setHistory((entries) => [...entries, { transaction, before, after }]);
       setRedoStack([]);
-      setDiagnostics([]);
+      setDiagnostics(getWorkbookDiagnostics(after));
     },
     [activeSheet.id, workbook],
   );
@@ -146,7 +150,7 @@ export function useOfficeWorkspace() {
       setSource(serializeSpreadsheetSource(after));
       setHistory((entries) => [...entries, { transaction, before, after }]);
       setRedoStack([]);
-      setDiagnostics([]);
+      setDiagnostics(getWorkbookDiagnostics(after));
     },
     [activeSheet.id, workbook],
   );
@@ -173,7 +177,7 @@ export function useOfficeWorkspace() {
       setSource(serializeSpreadsheetSource(after));
       setHistory((entries) => [...entries, { transaction, before, after }]);
       setRedoStack([]);
-      setDiagnostics([]);
+      setDiagnostics(getWorkbookDiagnostics(after));
     },
     [activeSheet.id, workbook],
   );
@@ -204,7 +208,9 @@ export function useOfficeWorkspace() {
       if (!latest) return entries;
       sourceUpdateOrigin.current = "visual";
       setWorkbook(latest.before);
-      setSource(serializeSpreadsheetSource(latest.before));
+      const nextSource = serializeSpreadsheetSource(latest.before);
+      setSource(nextSource);
+      setDiagnostics(parseSpreadsheetSource(nextSource).diagnostics);
       setRedoStack((redoEntries) => [...redoEntries, latest]);
       return entries.slice(0, -1);
     });
@@ -216,7 +222,9 @@ export function useOfficeWorkspace() {
       if (!latest) return entries;
       sourceUpdateOrigin.current = "visual";
       setWorkbook(latest.after);
-      setSource(serializeSpreadsheetSource(latest.after));
+      const nextSource = serializeSpreadsheetSource(latest.after);
+      setSource(nextSource);
+      setDiagnostics(parseSpreadsheetSource(nextSource).diagnostics);
       setHistory((historyEntries) => [...historyEntries, latest]);
       return entries.slice(0, -1);
     });
