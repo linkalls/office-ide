@@ -4,9 +4,9 @@ import { join, resolve } from "node:path";
 import chromium from "@sparticuz/chromium";
 import { chromium as playwrightChromium, type Locator, type Page } from "playwright-core";
 
-const FPS = 20;
+const FPS = 15;
 const VIEWPORT = { width: 1600, height: 900 };
-const DEVICE_SCALE_FACTOR = 1.5;
+const DEVICE_SCALE_FACTOR = 1;
 const APP_URL = "http://127.0.0.1:1420/";
 const ROOT = resolve(import.meta.dir, "..");
 const VIDEO_PATH = resolve(ROOT, "docs/media/office-ide-agent-demo.mp4");
@@ -95,7 +95,11 @@ async function installPresentationLayer(page: Page): Promise<void> {
 async function captureFrame(page: Page): Promise<void> {
   frame += 1;
   await page.screenshot({
-    path: join(frameDirectory, `frame-${String(frame).padStart(4, "0")}.png`),
+    // JPEG keeps repeated QA recording fast enough to run as a normal completion
+    // gate while preserving a high-quality 2400×1350 source for the final H.264.
+    path: join(frameDirectory, `frame-${String(frame).padStart(4, "0")}.jpg`),
+    type: "jpeg",
+    quality: 92,
     animations: "disabled",
   });
 }
@@ -461,7 +465,7 @@ try {
     "ffmpeg",
     "-hide_banner", "-loglevel", "error", "-y",
     "-framerate", String(FPS),
-    "-i", join(frameDirectory, "frame-%04d.png"),
+    "-i", join(frameDirectory, "frame-%04d.jpg"),
     "-vf", "scale=1920:1080:flags=lanczos",
     "-c:v", "libx264",
     "-preset", "slow",

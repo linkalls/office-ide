@@ -26,7 +26,7 @@ Ask for a regional sales summary
 
 - One story, about 20 seconds. Do not make a feature-tour montage.
 - Capture every prompt character so the input is visibly real.
-- Capture at 2400×1350 and deliver at 1920×1080/20fps.
+- Capture at 1600×900 and deliver at 1920×1080/15fps. Keep the complete interaction and assertion coverage fast enough to run after every change.
 - Move the camera only when the next state would be hard to read at full frame.
 - Move the large cursor to the actual target before every click and validate its coordinates.
 - Remove target frames when the target disappears; do not leave unexplained overlays.
