@@ -4,9 +4,9 @@ import { join, resolve } from "node:path";
 import chromium from "@sparticuz/chromium";
 import { chromium as playwrightChromium, type Locator, type Page } from "playwright-core";
 
-const FPS = 20;
+const FPS = 15;
 const VIEWPORT = { width: 1600, height: 900 };
-const DEVICE_SCALE_FACTOR = 1.5;
+const DEVICE_SCALE_FACTOR = 1;
 const APP_URL = "http://127.0.0.1:1420/";
 const ROOT = resolve(import.meta.dir, "..");
 const VIDEO_PATH = resolve(ROOT, "docs/media/office-ide-agent-demo.mp4");
