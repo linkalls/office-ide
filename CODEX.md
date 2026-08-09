@@ -131,7 +131,7 @@ bun run qa:complete
 - Bun tests: 47 passed / 0 failed
 - Vite production build: pass
 - Browser QA: 文字単位のAgent prompt入力、地域別集計proposal review、31 operations適用、Agent History、Undo/Redo、Agent cardのReverted/Re-applied同期、reload recoveryがpass。売上50万円以上の4行を検出し24 operations適用/Undoもpass。1600×900と980×760でbody overflowなし、console warning/errorなし
-- README media QA: 22秒/440 frames/20fps/1920×1080。2400×1350 sourceから高品質縮小し、大型カーソルの各target到達、Undo後History REVERTED/Agent card Reverted、Redo後History APPLIED/Agent card Re-appliedを検証し、MP4全体をffmpegで再デコード済み
+- README media QA: 約22秒/15fps/1920×1080。1600×900 sourceからLanczos変換し、大型カーソルの各target到達、Undo後History REVERTED/Agent card Reverted、Redo後History APPLIED/Agent card Re-appliedを検証し、MP4全体をffmpegで再デコードする
 - Rust/Tauri compile: GitHub ActionsのUbuntu 24.04でworkspace check/test/clippyがpass。追加runtime sliceも同じCIで継続検証する
 - Codex CLI smoke: `codex-cli 0.147.0`、ChatGPT login、read-only ephemeral turnでpass
 
