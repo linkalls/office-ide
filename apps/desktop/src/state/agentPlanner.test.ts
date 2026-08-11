@@ -1,7 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { applySpreadsheetOperations } from "@office-ide/operations";
 import { createEmptyWorkbook } from "@office-ide/spreadsheet-ir";
-import { planAgentRequest } from "./agentPlanner";
+import {
+  planAgentRequest,
+  planSheetctlCommand,
+  readSheetctlCommand,
+} from "./agentPlanner";
 
 function createSalesWorkbook() {
   const workbook = createEmptyWorkbook("Sales", "売上");
@@ -103,5 +107,105 @@ describe("local agent planner", () => {
     if (result.ok) return;
     expect(result.message).toContain("変更は行っていない");
     expect(result.suggestions).toHaveLength(4);
+  });
+
+  test("holds sheetctl cell writes as a proposal instead of mutating the workbook", () => {
+    const workbook = createSalesWorkbook();
+    const result = planSheetctlCommand('sheetctl cell set B2 "North region"', workbook);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(workbook.sheets[0]?.cells.B2).toBeUndefined();
+    expect(result.proposal.operations).toEqual([{
+      type: "set-cell-value",
+      sheetId: workbook.sheets[0]?.id,
+      address: "B2",
+      value: "North region",
+    }]);
+    expect(applySpreadsheetOperations(workbook, result.proposal.operations).sheets[0]?.cells.B2?.value)
+      .toBe("North region");
+  });
+
+  test("accepts a formula only through the sheetctl proposal boundary", () => {
+    const result = planAgentRequest("sheetctl formula set G2 =ROUND(C2/D2,0)", createSalesWorkbook());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.proposal.operations[0]).toMatchObject({
+      type: "set-formula",
+      address: "G2",
+      formula: "ROUND(C2/D2,0)",
+    });
+  });
+
+  test("groups a calculated column into one reviewable proposal", () => {
+    const result = planSheetctlCommand(
+      'sheetctl formula column G "Average unit price" =ROUND(C2/D2,0)',
+      createSalesWorkbook(),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.proposal.affectedRange).toBe("G1:G3");
+    expect(result.proposal.operations).toHaveLength(4);
+    expect(result.proposal.operationPreview).toHaveLength(4);
+  });
+
+  test("rejects invalid sheetctl formulas before creating a proposal", () => {
+    const result = planSheetctlCommand("sheetctl formula set G2 =SUM(", createSalesWorkbook());
+    expect(result).toEqual({
+      ok: false,
+      message: expect.stringContaining("Formula is invalid:"),
+      suggestions: ["sheetctl formula set G2 =ROUND(C2/D2,0)"],
+    });
+  });
+
+  test("serves active-sheet context without creating a proposal", () => {
+    const workbook = createSalesWorkbook();
+    const sheet = workbook.sheets[0]!;
+    const result = readSheetctlCommand("sheetctl context", workbook);
+    expect(result).toEqual({
+      ok: true,
+      message: JSON.stringify({
+        workbook: { id: "workbook-1", name: "Sales" },
+        activeSheet: {
+          id: "sheet-1",
+          name: sheet.name,
+          rowCount: 100,
+          columnCount: 26,
+          frozenRows: 0,
+          frozenColumns: 0,
+        },
+      }),
+    });
+  });
+
+  test("returns a bounded read-only range in row-major order", () => {
+    const workbook = createSalesWorkbook();
+    const sheet = workbook.sheets[0]!;
+    const result = readSheetctlCommand("sheetctl range C2:F3", workbook);
+    expect(result).toEqual({
+      ok: true,
+      message: JSON.stringify({
+        sheet: { id: "sheet-1", name: sheet.name },
+        range: "C2:F3",
+        cells: [
+          { address: "C2", value: 1000 },
+          { address: "D2", value: 4 },
+          { address: "F2", value: sheet.cells.F2?.value },
+          { address: "C3", value: 900 },
+          { address: "D3", value: 3 },
+          { address: "F3", value: sheet.cells.F3?.value },
+        ],
+      }),
+    });
+  });
+
+  test("rejects oversized or invalid sheetctl ranges before they can mutate", () => {
+    expect(readSheetctlCommand("sheetctl range A1:ZZ100", createSalesWorkbook())).toEqual({
+      ok: false,
+      message: "Range is outside the active sheet",
+    });
+    expect(readSheetctlCommand("sheetctl range A1:K100", createSalesWorkbook())).toEqual({
+      ok: false,
+      message: "Range is limited to 1,000 cells",
+    });
   });
 });

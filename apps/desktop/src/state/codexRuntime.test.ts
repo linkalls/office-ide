@@ -182,7 +182,7 @@ describe("Codex runtime reducer", () => {
     expect(state.statusMessage).toContain("Reattached");
   });
 
-  test("surfaces turn errors instead of pretending the runtime stayed ready", () => {
+  test("keeps the composer usable after a turn error", () => {
     const state = codexRuntimeReducer(createCodexRuntimeState(true), {
       type: "backend",
       event: {
@@ -197,12 +197,42 @@ describe("Codex runtime reducer", () => {
         },
       },
     });
-    expect(state.phase).toBe("error");
-    expect(state.statusMessage).toBe("Not logged in");
+    expect(state.phase).toBe("ready");
+    expect(state.turnId).toBeNull();
+    expect(state.statusMessage).toContain("Not logged in");
+    expect(state.statusMessage).toContain("ready to try again");
+  });
+
+  test("keeps the host ready when turn/start is rejected", () => {
+    const state = codexRuntimeReducer({
+      ...createCodexRuntimeState(true),
+      phase: "running",
+      threadId: "thr_123",
+      turnId: "turn_456",
+    }, { type: "turnFailed", message: "Invalid request" });
+
+    expect(state.phase).toBe("ready");
+    expect(state.threadId).toBe("thr_123");
+    expect(state.turnId).toBeNull();
+    expect(state.activities.at(-1)?.status).toBe("error");
   });
 
   test("reads version-matched response envelopes without hard-coding full schema", () => {
     expect(readThreadId({ thread: { id: "thr_1", extra: true } })).toBe("thr_1");
     expect(readTurnId({ turn: { id: "turn_1", status: "inProgress" } })).toBe("turn_1");
+  });
+
+  test("starts a new chat without tearing down the ready host", () => {
+    const state = codexRuntimeReducer({
+      ...createCodexRuntimeState(true),
+      phase: "ready",
+      threadId: "thread_1",
+      turnId: "turn_1",
+      activities: [{ id: "activity", kind: "turn", title: "Old turn", status: "completed" }],
+    }, { type: "newThread" });
+    expect(state.phase).toBe("ready");
+    expect(state.threadId).toBeNull();
+    expect(state.turnId).toBeNull();
+    expect(state.activities).toEqual([]);
   });
 });

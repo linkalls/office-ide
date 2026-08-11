@@ -14,7 +14,22 @@ interface AccountReadResult {
 const args = new Set(Bun.argv.slice(2));
 const includeTurn = args.has("--turn");
 const workspace = process.cwd();
+const officeSkillPath = `${workspace}${process.platform === "win32" ? "\\" : "/"}skills${process.platform === "win32" ? "\\" : "/"}office-ide-agent${process.platform === "win32" ? "\\" : "/"}SKILL.md`;
+const officeSkillRoot = `${workspace}${process.platform === "win32" ? "\\" : "/"}skills`;
 const timeoutMilliseconds = includeTurn ? 120_000 : 15_000;
+// Keep this smoke runner aligned with the native host. On Windows, `codex`
+// may be a stale global shim even when the official package is available via
+// Bun. The desktop host launches the pinned package through bunx as well.
+const defaultLauncher = process.platform === "win32"
+  ? { executable: "bunx", prefixArguments: ["--yes", "@openai/codex@0.147.0"] }
+  : { executable: "codex", prefixArguments: [] };
+const executable = process.env.CODEX_APP_SERVER_BIN ?? defaultLauncher.executable;
+const prefixArguments = process.env.CODEX_APP_SERVER_PREFIX_ARGS
+  ? JSON.parse(process.env.CODEX_APP_SERVER_PREFIX_ARGS) as unknown
+  : defaultLauncher.prefixArguments;
+if (!Array.isArray(prefixArguments) || !prefixArguments.every((argument) => typeof argument === "string")) {
+  throw new Error("CODEX_APP_SERVER_PREFIX_ARGS must be a JSON array of strings");
+}
 
 function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
   return Promise.race([
@@ -25,7 +40,7 @@ function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
   ]);
 }
 
-const child = Bun.spawn(["codex", "app-server"], {
+const child = Bun.spawn([executable, ...prefixArguments, "app-server"], {
   cwd: workspace,
   stdin: "pipe",
   stdout: "pipe",
@@ -123,6 +138,18 @@ try {
   }));
   await notify("initialized", {});
 
+  await request("skills/extraRoots/set", { extraRoots: [officeSkillRoot] });
+  const skills = asRecord(await request("skills/list", { cwds: [workspace], forceReload: true }));
+  const skillEntries = Array.isArray(skills?.data)
+    ? skills.data.flatMap((entry) => {
+        const record = asRecord(entry);
+        return Array.isArray(record?.skills) ? record.skills : [];
+      })
+    : [];
+  if (!skillEntries.some((entry) => asRecord(entry)?.name === "office-ide-agent")) {
+    throw new Error("Office IDE skill was not discovered by the app-server");
+  }
+
   const account = await request("account/read", {
     refreshToken: false,
   }) as AccountReadResult;
@@ -130,12 +157,35 @@ try {
     throw new Error("Codex is installed but not signed in");
   }
 
+  const modelList = asRecord(await request("model/list", { includeHidden: false }));
+  const models = Array.isArray(modelList?.data) ? modelList.data : [];
+  const selectedModel = models
+    .map(asRecord)
+    .find((model) => typeof model?.model === "string") ?? null;
+  if (!selectedModel || typeof selectedModel.model !== "string") {
+    throw new Error("model/list returned no selectable model");
+  }
+  const selectedEffort = typeof selectedModel.defaultReasoningEffort === "string"
+    ? selectedModel.defaultReasoningEffort
+    : null;
+
   console.log(JSON.stringify({
     initialized: initialize !== null,
     accountType: account.account?.type ?? "external",
     planType: account.account?.planType ?? null,
     codexTurnTest: includeTurn,
+    officeIdeSkillDiscovered: true,
+    modelPickerAvailable: true,
   }));
+
+  const threadList = asRecord(await request("thread/list", {
+    limit: 1,
+    cwd: workspace,
+  }));
+  if (!Array.isArray(threadList?.data)) {
+    throw new Error("thread/list returned no data array");
+  }
+  console.log(JSON.stringify({ threadListRead: true, returnedThreadCount: threadList.data.length }));
 
   if (includeTurn) {
     // Ephemeral keeps the smoke conversation out of normal thread history.
@@ -147,6 +197,8 @@ try {
       approvalPolicy: "never",
       sandbox: "read-only",
       serviceName: "office_ide_smoke",
+      developerInstructions: "Use the attached $office-ide-agent skill for Office IDE workbook work.",
+      model: selectedModel.model,
     }));
     const thread = asRecord(threadResponse?.thread);
     const threadId = typeof thread?.id === "string" ? thread.id : null;
@@ -157,7 +209,13 @@ try {
       cwd: workspace,
       approvalPolicy: "never",
       sandboxPolicy: { type: "readOnly", networkAccess: false },
+      model: selectedModel.model,
+      effort: selectedEffort,
       input: [{
+        type: "skill",
+        name: "office-ide-agent",
+        path: officeSkillPath,
+      }, {
         type: "text",
         text: "Reply with exactly OFFICE_IDE_SMOKE_OK. Do not use tools.",
       }],
@@ -174,6 +232,7 @@ try {
       threadStarted: true,
       turnCompleted: true,
       responseMarkerMatched: true,
+      modelOverrideAccepted: true,
     }));
   }
 } finally {

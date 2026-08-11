@@ -55,8 +55,10 @@ export type CodexRuntimeAction =
   | { type: "hostRestored" }
   | { type: "threadStarted"; threadId: string }
   | { type: "turnStarted"; turnId: string }
+  | { type: "newThread" }
   | { type: "requestAnswered"; id: string | number }
   | { type: "stopped" }
+  | { type: "turnFailed"; message: string }
   | { type: "failure"; message: string };
 
 export function createCodexRuntimeState(isDesktop: boolean): CodexRuntimeState {
@@ -177,8 +179,11 @@ function reduceNotification(
     const turnStatus = readString(turn, "status") ?? "completed";
     return {
       ...state,
-      phase: turnStatus === "failed" ? "error" : "ready",
-      statusMessage: turnStatus === "failed" ? "Codex turn failed" : "Codex app-server ready",
+      // A rejected/failed turn does not mean the app-server is unusable. Keep
+      // the host ready so the user can immediately correct the prompt or start
+      // a new chat instead of being stranded behind a reconnect-only state.
+      phase: "ready",
+      statusMessage: turnStatus === "failed" ? "Codex turn failed — ready to try again" : "Codex app-server ready",
       turnId: null,
       activities: upsertActivity(state.activities, {
         id: activityId("turn", turnId),
@@ -197,8 +202,12 @@ function reduceNotification(
     const detail = readString(error, "message") ?? "Codex turn failed";
     return {
       ...state,
-      phase: "error",
-      statusMessage: detail,
+      // The protocol also emits turn/completed after this notification. Treat
+      // it as a turn-level error, not a dead host, so normal controls stay
+      // usable even if that completion notification is delayed or omitted.
+      phase: "ready",
+      statusMessage: `${detail} — ready to try again`,
+      turnId: null,
       activities: [...state.activities, {
         id: activityId("error", turnId, String(state.activities.length)),
         kind: "protocol",
@@ -286,6 +295,17 @@ export function codexRuntimeReducer(
       turnId: action.turnId,
     };
   }
+  if (action.type === "newThread") {
+    return {
+      ...state,
+      phase: state.phase === "running" ? state.phase : "ready",
+      statusMessage: "Ready for a new Codex thread",
+      threadId: null,
+      turnId: null,
+      activities: [],
+      pendingRequests: [],
+    };
+  }
   if (action.type === "requestAnswered") {
     return {
       ...state,
@@ -309,6 +329,22 @@ export function codexRuntimeReducer(
   }
   if (action.type === "failure") {
     return { ...state, phase: "error", statusMessage: action.message };
+  }
+  if (action.type === "turnFailed") {
+    return {
+      ...state,
+      phase: "ready",
+      turnId: null,
+      statusMessage: `${action.message} — ready to try again`,
+      activities: [...state.activities, {
+        id: activityId("turn-failure", String(state.activities.length)),
+        kind: "protocol",
+        title: "Codex request failed",
+        detail: action.message,
+        status: "error",
+        threadId: state.threadId ?? undefined,
+      }],
+    };
   }
 
   const event = action.event;

@@ -25,7 +25,7 @@ export interface Diagnostic {
 export interface EditorContext {
   resourceId: string;
   resourceType: ResourceType;
-  activeView: "visual" | "source" | "diff" | "history" | "problems" | "terminal";
+  activeView: "visual" | "source" | "diff" | "history" | "problems" | "terminal" | "activity" | "git";
   selection?: string[];
   activeCell?: string | null;
 }
