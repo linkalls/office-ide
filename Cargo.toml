@@ -3,7 +3,9 @@ resolver = "2"
 members = [
   "apps/desktop/src-tauri",
   "crates/office-core",
-  "crates/ipc"
+  "crates/ipc",
+  "crates/sheetctl",
+  "crates/docctl"
 ]
 
 [workspace.package]

@@ -12,10 +12,17 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+calamine = "0.36"
+notify = "8"
 office-core = { path = "../../../crates/office-core" }
 office-ipc = { path = "../../../crates/ipc" }
+rfd = "0.17"
+rust_xlsxwriter = "0.97"
+quick-xml = "0.41"
 serde.workspace = true
 serde_json.workspace = true
 tauri = { version = "2", features = [] }
 thiserror.workspace = true
-tokio = { version = "1", features = ["io-util", "process", "sync", "time"] }
+tokio = { version = "1", features = ["io-util", "net", "process", "sync", "time"] }
+uuid.workspace = true
+zip = "8.6"

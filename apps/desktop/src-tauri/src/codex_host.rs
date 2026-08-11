@@ -1,7 +1,10 @@
+use crate::{docctl_host::DocctlCapability, sheetctl_host::SheetctlCapability};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::{
     collections::HashMap,
+    env,
+    path::{Path, PathBuf},
     process::Stdio,
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -20,6 +23,7 @@ use tokio::{
 
 const CODEX_EVENT_NAME: &str = "codex://event";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
+const OFFICE_IDE_SKILL_NAME: &str = "office-ide-agent";
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -90,6 +94,8 @@ pub enum CodexHostError {
     NotAuthenticated,
     #[error("failed to start `codex app-server`: {0}")]
     Spawn(#[source] std::io::Error),
+    #[error("CODEX_APP_SERVER_PREFIX_ARGS must be a JSON array of strings: {0}")]
+    InvalidLauncherArguments(#[source] serde_json::Error),
     #[error("failed to write to Codex app-server: {0}")]
     Write(#[source] std::io::Error),
     #[error("Codex app-server request {0} timed out")]
@@ -98,6 +104,12 @@ pub enum CodexHostError {
     ResponseClosed(u64),
     #[error("Codex app-server rejected the request: {0}")]
     Server(String),
+    #[error("Office IDE skill is unavailable for this workspace: {0}")]
+    SkillUnavailable(String),
+    #[error(
+        "Office IDE control CLIs are unavailable; run `bun run tauri` from the workspace first"
+    )]
+    ControlCliUnavailable,
 }
 
 type PendingResponse = oneshot::Sender<Result<Value, String>>;
@@ -131,8 +143,39 @@ impl Default for CodexHost {
     }
 }
 
+fn parse_launcher_prefix(value: Option<&str>) -> Result<Vec<String>, CodexHostError> {
+    value
+        .map(serde_json::from_str::<Vec<String>>)
+        .transpose()
+        .map_err(CodexHostError::InvalidLauncherArguments)
+        .map(|arguments| arguments.unwrap_or_default())
+}
+
+fn default_launcher() -> (String, Vec<String>) {
+    // The Windows Store desktop app does not expose its bundled Codex binary
+    // as an executable child process. On Windows use Bun's official package
+    // runner by default; it is cached after the first launch. An explicit
+    // CODEX_APP_SERVER_BIN always takes precedence for managed installations.
+    #[cfg(target_os = "windows")]
+    {
+        (
+            "bunx".to_owned(),
+            vec!["--yes".to_owned(), "@openai/codex@0.147.0".to_owned()],
+        )
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        ("codex".to_owned(), Vec::new())
+    }
+}
+
 impl CodexHost {
-    pub async fn start(&self, app: AppHandle) -> Result<Value, CodexHostError> {
+    pub async fn start(
+        &self,
+        app: AppHandle,
+        sheetctl: SheetctlCapability,
+        docctl: DocctlCapability,
+    ) -> Result<Value, CodexHostError> {
         {
             let shared = self.shared.lock().await;
             if shared.process.is_some() {
@@ -145,14 +188,31 @@ impl CodexHost {
             CodexRuntimeEvent::phase("starting", "Starting Codex app-server"),
         );
 
-        let mut child = Command::new("codex")
+        let (default_executable, default_prefix) = default_launcher();
+        let executable = env::var("CODEX_APP_SERVER_BIN").unwrap_or(default_executable);
+        let prefix_arguments = match env::var("CODEX_APP_SERVER_PREFIX_ARGS") {
+            Ok(value) => parse_launcher_prefix(Some(&value))?,
+            Err(_) => default_prefix,
+        };
+        let control_cli_dir = control_cli_dir()?;
+        let child_path = prepend_path(control_cli_dir, env::var_os("PATH"));
+        let mut command = Command::new(executable);
+        command
+            .args(prefix_arguments)
             .arg("app-server")
+            // Only the app-server child inherits the ephemeral loopback
+            // capability. The WebView, events, history, and workspace files
+            // never receive either value.
+            .env("SHEETCTL_ENDPOINT", sheetctl.endpoint)
+            .env("SHEETCTL_TOKEN", sheetctl.token)
+            .env("DOCCTL_ENDPOINT", docctl.endpoint)
+            .env("DOCCTL_TOKEN", docctl.token)
+            .env("PATH", child_path)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .kill_on_drop(true)
-            .spawn()
-            .map_err(CodexHostError::Spawn)?;
+            .kill_on_drop(true);
+        let mut child = command.spawn().map_err(CodexHostError::Spawn)?;
 
         let stdin = child.stdin.take().ok_or_else(|| {
             CodexHostError::Spawn(std::io::Error::new(
@@ -234,14 +294,22 @@ impl CodexHost {
         Ok(initialize)
     }
 
-    pub async fn start_thread(&self, cwd: String) -> Result<Value, CodexHostError> {
+    pub async fn start_thread(
+        &self,
+        cwd: String,
+        model: Option<String>,
+    ) -> Result<Value, CodexHostError> {
+        let skill_path = office_ide_skill_path(&cwd)?;
+        self.register_skill_root(&skill_path).await?;
         self.request(
             "thread/start",
             json!({
                 "cwd": cwd,
                 "approvalPolicy": "on-request",
                 "sandbox": "workspace-write",
-                "serviceName": "office_ide"
+                "model": model,
+                "serviceName": "office_ide",
+                "developerInstructions": "Use the attached $office-ide-agent skill for Office IDE spreadsheet and document work. Inspect spreadsheets with sheetctl and Djot documents with docctl before proposing edits; every mutation remains review-first."
             }),
         )
         .await
@@ -257,18 +325,37 @@ impl CodexHost {
         .await
     }
 
+    pub async fn list_threads(&self, cwd: String) -> Result<Value, CodexHostError> {
+        self.request("thread/list", json!({ "limit": 20, "cwd": cwd }))
+            .await
+    }
+
+    pub async fn list_models(&self) -> Result<Value, CodexHostError> {
+        self.request("model/list", json!({ "includeHidden": false }))
+            .await
+    }
+
     pub async fn start_turn(
         &self,
         thread_id: String,
         prompt: String,
         cwd: String,
+        model: Option<String>,
+        effort: Option<String>,
     ) -> Result<Value, CodexHostError> {
+        let skill_path = office_ide_skill_path(&cwd)?;
+        self.register_skill_root(&skill_path).await?;
         self.request(
             "turn/start",
             json!({
                 "threadId": thread_id,
-                "input": [{ "type": "text", "text": prompt }],
+                "input": [
+                    { "type": "skill", "name": OFFICE_IDE_SKILL_NAME, "path": skill_path },
+                    { "type": "text", "text": prompt }
+                ],
                 "cwd": cwd,
+                "model": model,
+                "effort": effort,
                 "approvalPolicy": "on-request",
                 "sandboxPolicy": {
                     "type": "workspaceWrite",
@@ -280,6 +367,21 @@ impl CodexHost {
             }),
         )
         .await
+    }
+
+    async fn register_skill_root(&self, skill_path: &Path) -> Result<(), CodexHostError> {
+        let root = skill_path
+            .parent()
+            .and_then(Path::parent)
+            .ok_or_else(|| CodexHostError::SkillUnavailable(skill_path.display().to_string()))?;
+        self.request(
+            "skills/extraRoots/set",
+            json!({
+                "extraRoots": [root]
+            }),
+        )
+        .await?;
+        Ok(())
     }
 
     pub async fn interrupt_turn(
@@ -426,6 +528,55 @@ impl CodexHost {
     }
 }
 
+fn control_cli_dir() -> Result<PathBuf, CodexHostError> {
+    let suffix = env::consts::EXE_SUFFIX;
+    let is_valid = |directory: &Path| {
+        directory.join(format!("sheetctl{suffix}")).is_file()
+            && directory.join(format!("docctl{suffix}")).is_file()
+    };
+    if let Some(directory) = env::var_os("OFFICE_IDE_CONTROL_CLI_DIR").map(PathBuf::from) {
+        if is_valid(&directory) {
+            return Ok(directory);
+        }
+    }
+    let mut candidates = Vec::new();
+    if let Ok(current) = env::current_exe() {
+        if let Some(directory) = current.parent() {
+            candidates.push(directory.to_path_buf());
+        }
+    }
+    if let Ok(current) = env::current_dir() {
+        for root in current.ancestors() {
+            candidates.push(root.join("target").join("debug"));
+            candidates.push(root.join("target").join("release"));
+        }
+    }
+    candidates
+        .into_iter()
+        .find(|directory| is_valid(directory))
+        .ok_or(CodexHostError::ControlCliUnavailable)
+}
+
+fn prepend_path(directory: PathBuf, inherited: Option<std::ffi::OsString>) -> std::ffi::OsString {
+    let mut paths = vec![directory];
+    if let Some(inherited) = inherited {
+        paths.extend(env::split_paths(&inherited));
+    }
+    env::join_paths(paths).expect("valid executable search path")
+}
+
+fn office_ide_skill_path(cwd: &str) -> Result<PathBuf, CodexHostError> {
+    let candidate = Path::new(cwd)
+        .ancestors()
+        .map(|root| {
+            root.join("skills")
+                .join(OFFICE_IDE_SKILL_NAME)
+                .join("SKILL.md")
+        })
+        .find(|path| path.is_file());
+    candidate.ok_or_else(|| CodexHostError::SkillUnavailable(cwd.to_owned()))
+}
+
 #[derive(Debug)]
 enum IncomingMessage {
     Response {
@@ -509,6 +660,34 @@ mod tests {
     use super::*;
 
     #[test]
+    fn parses_optional_development_launcher_arguments_without_shell_splitting() {
+        assert_eq!(parse_launcher_prefix(None).unwrap(), Vec::<String>::new());
+        assert_eq!(
+            parse_launcher_prefix(Some(r#"["--yes","@openai/codex"]"#)).unwrap(),
+            vec!["--yes", "@openai/codex"],
+        );
+        assert!(matches!(
+            parse_launcher_prefix(Some("--yes @openai/codex")),
+            Err(CodexHostError::InvalidLauncherArguments(_))
+        ));
+    }
+
+    #[test]
+    fn has_a_usable_windows_default_launcher_and_allows_environment_override() {
+        let (executable, prefix) = default_launcher();
+        #[cfg(target_os = "windows")]
+        assert_eq!(
+            (executable, prefix),
+            (
+                "bunx".to_owned(),
+                vec!["--yes".to_owned(), "@openai/codex@0.147.0".to_owned()]
+            )
+        );
+        #[cfg(not(target_os = "windows"))]
+        assert_eq!((executable, prefix), ("codex".to_owned(), Vec::new()));
+    }
+
+    #[test]
     fn wire_requests_omit_jsonrpc_header() {
         let message = json!({ "method": "thread/start", "id": 1, "params": {} });
         assert!(message.get("jsonrpc").is_none());
@@ -575,5 +754,12 @@ mod tests {
             "account": null,
             "requiresOpenaiAuth": false
         })));
+    }
+
+    #[test]
+    fn resolves_relative_workspace_paths_to_absolute_paths() {
+        let path = crate::absolute_workspace_path(".".to_owned()).unwrap();
+        assert!(Path::new(&path).is_absolute());
+        assert!(Path::new(&path).is_dir());
     }
 }
