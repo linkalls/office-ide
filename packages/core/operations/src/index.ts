@@ -193,6 +193,7 @@ export type SpreadsheetOperation =
       name: string;
     }
   | {
+<<<<<<< ours
       type: "add-sheet";
       sheetId: string;
       name: string;
@@ -206,10 +207,13 @@ export type SpreadsheetOperation =
       sheetId: string;
     }
   | {
+=======
+>>>>>>> theirs
       type: "set-cell-style";
       sheetId: string;
       address: string;
       style: CellStyle;
+<<<<<<< ours
     }
   | {
       type: "set-column-width";
@@ -243,6 +247,59 @@ export type SpreadsheetOperation =
       formula: string;
     };
 
+export type DocumentOperation =
+  | {
+      type: "insert-block";
+      block: import("@office-ide/document-ir").DocumentBlock;
+      afterBlockId?: string;
+    }
+  | {
+      type: "delete-block";
+      blockId: string;
+    }
+  | {
+      type: "move-block";
+      blockId: string;
+      afterBlockId?: string;
+    }
+  | {
+      type: "update-block";
+      blockId: string;
+      patch: Partial<import("@office-ide/document-ir").DocumentBlock>;
+    }
+  | {
+      type: "replace-text";
+      blockId: string;
+      text: string;
+    }
+  | {
+      type: "set-paragraph-style";
+      blockId: string;
+      styleId: string;
+    }
+  | {
+      type: "insert-table";
+      rows: number;
+      columns: number;
+      afterBlockId?: string;
+    }
+  | {
+      type: "add-comment";
+      comment: import("@office-ide/document-ir").DocumentComment;
+    }
+  | {
+      type: "resolve-comment";
+      commentId: string;
+    }
+  | {
+      type: "add-footnote";
+      footnote: import("@office-ide/document-ir").Footnote;
+=======
+>>>>>>> theirs
+    };
+
+export type Operation = SpreadsheetOperation | DocumentOperation;
+
 export interface Transaction {
   id: string;
   actor: Actor;
@@ -250,6 +307,136 @@ export interface Transaction {
   label: string;
   operations: SpreadsheetOperation[];
 }
+
+export interface DocumentTransaction {
+  id: string;
+  actor: Actor;
+  timestamp: number;
+  label: string;
+  operations: DocumentOperation[];
+}
+
+export function applyDocumentOperations(
+  source: import("@office-ide/document-ir").DocumentModel,
+  operations: DocumentOperation[],
+): import("@office-ide/document-ir").DocumentModel {
+  const model = structuredClone(source);
+
+  for (const operation of operations) {
+    if (operation.type === "insert-block") {
+      if (operation.afterBlockId) {
+        const index = model.blocks.findIndex((b) => b.id === operation.afterBlockId);
+        if (index >= 0) {
+          model.blocks.splice(index + 1, 0, operation.block);
+          continue;
+        }
+      }
+      model.blocks.push(operation.block);
+      continue;
+    }
+
+    if (operation.type === "delete-block") {
+      const index = model.blocks.findIndex((b) => b.id === operation.blockId);
+      if (index >= 0) {
+        model.blocks.splice(index, 1);
+      }
+      continue;
+    }
+
+    if (operation.type === "move-block") {
+      const index = model.blocks.findIndex((b) => b.id === operation.blockId);
+      if (index >= 0) {
+        const [block] = model.blocks.splice(index, 1);
+        if (operation.afterBlockId) {
+          const targetIndex = model.blocks.findIndex((b) => b.id === operation.afterBlockId);
+          if (targetIndex >= 0) {
+            model.blocks.splice(targetIndex + 1, 0, block);
+            continue;
+          }
+        }
+        model.blocks.push(block);
+      }
+      continue;
+    }
+
+    if (operation.type === "update-block") {
+      const block = model.blocks.find((b) => b.id === operation.blockId);
+      if (block) {
+        Object.assign(block, operation.patch);
+      }
+      continue;
+    }
+
+    if (operation.type === "replace-text") {
+      const block = model.blocks.find((b) => b.id === operation.blockId);
+      if (block && "text" in block) {
+        (block as { text: string }).text = operation.text;
+      }
+      continue;
+    }
+
+    if (operation.type === "set-paragraph-style") {
+      const block = model.blocks.find((b) => b.id === operation.blockId);
+      if (block && (block.type === "paragraph" || block.type === "heading")) {
+        (block as { styleId?: string }).styleId = operation.styleId;
+      }
+      continue;
+    }
+
+    if (operation.type === "insert-table") {
+      const tableBlock: import("@office-ide/document-ir").TableBlock = {
+        id: `table_${Date.now()}`,
+        type: "table",
+        headers: Array.from({ length: operation.columns }, (_, i) => `Col ${i + 1}`),
+        rows: Array.from({ length: operation.rows }, () =>
+          Array.from({ length: operation.columns }, () => ""),
+        ),
+      };
+      if (operation.afterBlockId) {
+        const index = model.blocks.findIndex((b) => b.id === operation.afterBlockId);
+        if (index >= 0) {
+          model.blocks.splice(index + 1, 0, tableBlock);
+          continue;
+        }
+      }
+      model.blocks.push(tableBlock);
+      continue;
+    }
+
+    if (operation.type === "add-comment") {
+      model.comments.push(operation.comment);
+      continue;
+    }
+
+    if (operation.type === "resolve-comment") {
+      const comment = model.comments.find((c) => c.id === operation.commentId);
+      if (comment) comment.resolved = true;
+      continue;
+    }
+
+    if (operation.type === "add-footnote") {
+      model.footnotes.push(operation.footnote);
+      continue;
+    }
+  }
+
+  return model;
+}
+
+export function createDocumentTransaction(
+  label: string,
+  operations: DocumentOperation[],
+  actor: Actor = { type: "user" },
+): DocumentTransaction {
+  return {
+    id: `${crypto.randomUUID()}-${++transactionSequence}`,
+    actor,
+    timestamp: Date.now(),
+    label,
+    operations,
+  };
+}
+
 
 export function applySpreadsheetOperations(
   source: SpreadsheetWorkbook,

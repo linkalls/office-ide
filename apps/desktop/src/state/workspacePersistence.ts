@@ -5,7 +5,14 @@ import {
 import type { SpreadsheetWorkbook } from "@office-ide/spreadsheet-ir";
 
 export const WORKSPACE_STORAGE_KEY = "office-ide.workspace.sales-report.v1";
-const SNAPSHOT_VERSION = 1;
+const SNAPSHOT_VERSION = 3;
+const LEGACY_SNAPSHOT_VERSIONS = [1, 2] as const;
+
+export interface StoredDocument {
+  id: string;
+  name: string;
+  source: string;
+}
 
 export interface WorkspaceStorage {
   getItem(key: string): string | null;
@@ -16,14 +23,18 @@ export interface WorkspaceStorage {
 export interface RestoredWorkspace {
   workbook: SpreadsheetWorkbook;
   source: string;
+  documentSource: string | null;
+  documents: StoredDocument[] | null;
   savedAt: number;
 }
 
 interface WorkspaceSnapshot {
-  version: typeof SNAPSHOT_VERSION;
+  version: typeof SNAPSHOT_VERSION | (typeof LEGACY_SNAPSHOT_VERSIONS)[number];
   savedAt: number;
   activeSheetId: string;
   source: string;
+  documentSource?: string;
+  documents?: StoredDocument[];
 }
 
 /**
@@ -36,7 +47,7 @@ export function loadWorkspaceSnapshot(storage: WorkspaceStorage): RestoredWorksp
     if (!serialized) return null;
     const snapshot = JSON.parse(serialized) as Partial<WorkspaceSnapshot>;
     if (
-      snapshot.version !== SNAPSHOT_VERSION
+      (snapshot.version !== SNAPSHOT_VERSION && !LEGACY_SNAPSHOT_VERSIONS.includes(snapshot.version as 1 | 2))
       || typeof snapshot.savedAt !== "number"
       || typeof snapshot.source !== "string"
       || typeof snapshot.activeSheetId !== "string"
@@ -50,6 +61,15 @@ export function loadWorkspaceSnapshot(storage: WorkspaceStorage): RestoredWorksp
     return {
       workbook: parsed.workbook,
       source: snapshot.source,
+      documentSource: typeof snapshot.documentSource === "string" ? snapshot.documentSource : null,
+      documents: Array.isArray(snapshot.documents)
+        ? snapshot.documents.filter((document): document is StoredDocument => (
+            Boolean(document)
+            && typeof document.id === "string"
+            && typeof document.name === "string"
+            && typeof document.source === "string"
+          ))
+        : null,
       savedAt: snapshot.savedAt,
     };
   } catch {
@@ -60,6 +80,7 @@ export function loadWorkspaceSnapshot(storage: WorkspaceStorage): RestoredWorksp
 export function saveWorkspaceSnapshot(
   storage: WorkspaceStorage,
   workbook: SpreadsheetWorkbook,
+  documents: StoredDocument[],
   savedAt = Date.now(),
 ): number {
   const snapshot: WorkspaceSnapshot = {
@@ -67,6 +88,8 @@ export function saveWorkspaceSnapshot(
     savedAt,
     activeSheetId: workbook.activeSheetId,
     source: serializeSpreadsheetSource(workbook),
+    documentSource: documents[0]?.source ?? "",
+    documents,
   };
   storage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(snapshot));
   return savedAt;

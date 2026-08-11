@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { createEmptyWorkbook } from "@office-ide/spreadsheet-ir";
+<<<<<<< ours
 import {
   applySpreadsheetOperations,
   createTransaction,
@@ -13,6 +14,11 @@ describe("spreadsheet operations", () => {
     expect(first.id).not.toBe(second.id);
   });
 
+=======
+import { applySpreadsheetOperations } from "./index";
+
+describe("spreadsheet operations", () => {
+>>>>>>> theirs
   test("applies formatting without replacing cell content", () => {
     const workbook = createEmptyWorkbook();
     workbook.sheets[0]!.cells.A1 = { address: "A1", value: "Heading" };
@@ -51,6 +57,7 @@ describe("spreadsheet operations", () => {
     expect(changed.sheets[0]?.cells.B2?.value).toBe(2);
     expect(changed.sheets[0]?.cells.B2?.style).toEqual({ italic: true });
   });
+<<<<<<< ours
 
   test("applies row and column dimensions immutably", () => {
     const workbook = createEmptyWorkbook();
@@ -218,3 +225,54 @@ describe("spreadsheet operations", () => {
     }])).toThrow("cannot be empty");
   });
 });
+
+describe("document operations", () => {
+  test("inserts, updates, replaces text, and deletes blocks immutably", async () => {
+    const { createEmptyDocument } = await import("../../document-ir/src/index");
+    const { applyDocumentOperations, createDocumentTransaction } = await import("./index");
+
+    const doc = createEmptyDocument("doc-1", "Test Doc");
+    expect(doc.blocks.length).toBe(2);
+
+    const inserted = applyDocumentOperations(doc, [
+      {
+        type: "insert-block",
+        block: {
+          id: "para-2",
+          type: "paragraph",
+          text: "Second paragraph",
+        },
+      },
+    ]);
+    expect(inserted.blocks.length).toBe(3);
+    expect(inserted.blocks[2]?.id).toBe("para-2");
+
+    const updated = applyDocumentOperations(inserted, [
+      {
+        type: "replace-text",
+        blockId: "para-2",
+        text: "Updated text",
+      },
+    ]);
+    const block = updated.blocks.find((b) => b.id === "para-2");
+    expect(block && "text" in block ? block.text : "").toBe("Updated text");
+
+    const deleted = applyDocumentOperations(updated, [
+      {
+        type: "delete-block",
+        blockId: "para-2",
+      },
+    ]);
+    expect(deleted.blocks.length).toBe(2);
+
+    const tx = createDocumentTransaction("Edited document", [
+      { type: "replace-text", blockId: doc.blocks[0].id, text: "New Title" },
+    ]);
+    expect(tx.id).toBeDefined();
+    expect(tx.operations.length).toBe(1);
+  });
+});
+
+=======
+});
+>>>>>>> theirs

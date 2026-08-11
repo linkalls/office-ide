@@ -516,8 +516,38 @@ class SheetCalculator {
     return leftNumber ** rightNumber;
   }
 
+  private asGrid(node: FormulaNode): FormulaValue[][] {
+    if (node.type === "range") return this.evaluateRangeGrid(node.start, node.end);
+    if (node.type === "cell") return [[this.calculateCell(node.address)]];
+    const evaluated = this.evaluate(node);
+    if (Array.isArray(evaluated)) return [evaluated];
+    return [[evaluated]];
+  }
+
+  private evaluateRangeGrid(startAddress: string, endAddress: string): FormulaValue[][] {
+    const start = parseAddress(startAddress);
+    const end = parseAddress(endAddress);
+    if (!start || !end) return [["#REF!"]];
+    const grid: FormulaValue[][] = [];
+    const firstColumn = Math.min(start.column, end.column);
+    const lastColumn = Math.max(start.column, end.column);
+    const firstRow = Math.min(start.row, end.row);
+    const lastRow = Math.max(start.row, end.row);
+    for (let row = firstRow; row <= lastRow; row += 1) {
+      const rowValues: FormulaValue[] = [];
+      for (let column = firstColumn; column <= lastColumn; column += 1) {
+        rowValues.push(this.calculateCell(`${columnIndexToLabel(column)}${row}`));
+      }
+      grid.push(rowValues);
+    }
+    return grid;
+  }
+
   private evaluateCall(node: CallNode): FormulaValue {
-    if (node.name === "IF") {
+    const name = node.name.toUpperCase();
+
+    // Lazy / Special conditional evaluation
+    if (name === "IF") {
       if (node.arguments.length < 2 || node.arguments.length > 3) return "#VALUE!";
       const condition = isTruthy(asScalar(this.evaluate(node.arguments[0])));
       if (isFormulaError(condition)) return condition;
@@ -525,7 +555,50 @@ class SheetCalculator {
       return branch ? asScalar(this.evaluate(branch)) : false;
     }
 
-    if (node.name === "AND" || node.name === "OR") {
+    if (name === "IFERROR") {
+      if (node.arguments.length !== 2) return "#VALUE!";
+      try {
+        const value = asScalar(this.evaluate(node.arguments[0]));
+        if (isFormulaError(value)) return asScalar(this.evaluate(node.arguments[1]));
+        return value;
+      } catch {
+        return asScalar(this.evaluate(node.arguments[1]));
+      }
+    }
+
+    if (name === "IFNA") {
+      if (node.arguments.length !== 2) return "#VALUE!";
+      const value = asScalar(this.evaluate(node.arguments[0]));
+      if (value === "#REF!" || value === "#VALUE!") return asScalar(this.evaluate(node.arguments[1]));
+      return value;
+    }
+
+    if (name === "IFS") {
+      if (node.arguments.length < 2 || node.arguments.length % 2 !== 0) return "#VALUE!";
+      for (let i = 0; i < node.arguments.length; i += 2) {
+        const condition = isTruthy(asScalar(this.evaluate(node.arguments[i])));
+        if (isFormulaError(condition)) return condition;
+        if (condition) return asScalar(this.evaluate(node.arguments[i + 1]));
+      }
+      return "#VALUE!";
+    }
+
+    if (name === "SWITCH") {
+      if (node.arguments.length < 3) return "#VALUE!";
+      const target = asScalar(this.evaluate(node.arguments[0]));
+      if (isFormulaError(target)) return target;
+      for (let i = 1; i < node.arguments.length - 1; i += 2) {
+        const val = asScalar(this.evaluate(node.arguments[i]));
+        if (val === target) return asScalar(this.evaluate(node.arguments[i + 1]));
+      }
+      // Odd number of remaining args has default
+      if ((node.arguments.length - 1) % 2 === 1) {
+        return asScalar(this.evaluate(node.arguments.at(-1)!));
+      }
+      return "#VALUE!";
+    }
+
+    if (name === "AND" || name === "OR") {
       const values = flatten(node.arguments.map((argument) => this.evaluate(argument)));
       const booleans: boolean[] = [];
       for (const value of values) {
@@ -533,45 +606,316 @@ class SheetCalculator {
         if (isFormulaError(truthy)) return truthy;
         booleans.push(truthy);
       }
-      return node.name === "AND" ? booleans.every(Boolean) : booleans.some(Boolean);
+      return name === "AND" ? booleans.every(Boolean) : booleans.some(Boolean);
     }
 
-    if (node.name === "NOT") {
+    if (name === "NOT") {
       if (node.arguments.length !== 1) return "#VALUE!";
       const truthy = isTruthy(asScalar(this.evaluate(node.arguments[0])));
       return isFormulaError(truthy) ? truthy : !truthy;
     }
 
+    // Information functions
+    if (name === "ISBLANK") {
+      if (node.arguments.length !== 1) return "#VALUE!";
+      const val = asScalar(this.evaluate(node.arguments[0]));
+      return val === null || val === "";
+    }
+
+    if (name === "ISNUMBER") {
+      if (node.arguments.length !== 1) return "#VALUE!";
+      const val = asScalar(this.evaluate(node.arguments[0]));
+      return typeof val === "number";
+    }
+
+    if (name === "ISTEXT") {
+      if (node.arguments.length !== 1) return "#VALUE!";
+      const val = asScalar(this.evaluate(node.arguments[0]));
+      return typeof val === "string" && !isFormulaError(val);
+    }
+
+    if (name === "ISERROR") {
+      if (node.arguments.length !== 1) return "#VALUE!";
+      const val = asScalar(this.evaluate(node.arguments[0]));
+      return isFormulaError(val);
+    }
+
+    // Lookup & Reference functions
+    if (name === "ROW") {
+      if (node.arguments.length === 0) return 1;
+      const firstArg = node.arguments[0];
+      if (firstArg.type === "cell") {
+        const pos = parseAddress(firstArg.address);
+        return pos ? pos.row : "#REF!";
+      }
+      if (firstArg.type === "range") {
+        const pos = parseAddress(firstArg.start);
+        return pos ? pos.row : "#REF!";
+      }
+      return 1;
+    }
+
+    if (name === "COLUMN") {
+      if (node.arguments.length === 0) return 1;
+      const firstArg = node.arguments[0];
+      if (firstArg.type === "cell") {
+        const pos = parseAddress(firstArg.address);
+        return pos ? pos.column : "#REF!";
+      }
+      if (firstArg.type === "range") {
+        const pos = parseAddress(firstArg.start);
+        return pos ? pos.column : "#REF!";
+      }
+      return 1;
+    }
+
+    if (name === "CHOOSE") {
+      if (node.arguments.length < 2) return "#VALUE!";
+      const indexNum = asNumber(asScalar(this.evaluate(node.arguments[0])));
+      if (isFormulaError(indexNum)) return indexNum;
+      const idx = Math.trunc(indexNum);
+      if (idx < 1 || idx >= node.arguments.length) return "#VALUE!";
+      return asScalar(this.evaluate(node.arguments[idx]));
+    }
+
+    if (name === "INDEX") {
+      if (node.arguments.length < 2 || node.arguments.length > 3) return "#VALUE!";
+      const grid = this.asGrid(node.arguments[0]);
+      const rowNum = asNumber(asScalar(this.evaluate(node.arguments[1])));
+      if (isFormulaError(rowNum)) return rowNum;
+      const colNum = node.arguments[2] ? asNumber(asScalar(this.evaluate(node.arguments[2]))) : 1;
+      if (isFormulaError(colNum)) return colNum;
+      const r = Math.trunc(rowNum) - 1;
+      const c = Math.trunc(colNum) - 1;
+      if (r < 0 || r >= grid.length || c < 0 || c >= (grid[r]?.length ?? 0)) return "#REF!";
+      return grid[r][c];
+    }
+
+    if (name === "MATCH") {
+      if (node.arguments.length < 2 || node.arguments.length > 3) return "#VALUE!";
+      const target = asScalar(this.evaluate(node.arguments[0]));
+      if (isFormulaError(target)) return target;
+      const grid = this.asGrid(node.arguments[1]);
+      const items = flatten(grid);
+      const index = items.findIndex((item) => {
+        if (typeof target === "number" && typeof item === "number") return target === item;
+        return String(item ?? "").toLowerCase() === String(target ?? "").toLowerCase();
+      });
+      return index >= 0 ? index + 1 : "#REF!";
+    }
+
+    if (name === "VLOOKUP") {
+      if (node.arguments.length < 3 || node.arguments.length > 4) return "#VALUE!";
+      const target = asScalar(this.evaluate(node.arguments[0]));
+      if (isFormulaError(target)) return target;
+      const grid = this.asGrid(node.arguments[1]);
+      const colIndex = asNumber(asScalar(this.evaluate(node.arguments[2])));
+      if (isFormulaError(colIndex)) return colIndex;
+      const cIdx = Math.trunc(colIndex) - 1;
+      if (cIdx < 0) return "#REF!";
+
+      for (const row of grid) {
+        const first = row[0];
+        const match = typeof target === "number" && typeof first === "number"
+          ? target === first
+          : String(first ?? "").toLowerCase() === String(target ?? "").toLowerCase();
+        if (match) {
+          return cIdx < row.length ? row[cIdx] : "#REF!";
+        }
+      }
+      return "#REF!";
+    }
+
+    if (name === "HLOOKUP") {
+      if (node.arguments.length < 3 || node.arguments.length > 4) return "#VALUE!";
+      const target = asScalar(this.evaluate(node.arguments[0]));
+      if (isFormulaError(target)) return target;
+      const grid = this.asGrid(node.arguments[1]);
+      const rowIndex = asNumber(asScalar(this.evaluate(node.arguments[2])));
+      if (isFormulaError(rowIndex)) return rowIndex;
+      const rIdx = Math.trunc(rowIndex) - 1;
+      if (rIdx < 0 || rIdx >= grid.length) return "#REF!";
+
+      const firstRow = grid[0] ?? [];
+      for (let col = 0; col < firstRow.length; col += 1) {
+        const val = firstRow[col];
+        const match = typeof target === "number" && typeof val === "number"
+          ? target === val
+          : String(val ?? "").toLowerCase() === String(target ?? "").toLowerCase();
+        if (match) {
+          return grid[rIdx][col] ?? "#REF!";
+        }
+      }
+      return "#REF!";
+    }
+
+    // Criteria Math functions (SUMIF, COUNTIF, AVERAGEIF)
+    if (name === "SUMIF" || name === "COUNTIF" || name === "AVERAGEIF") {
+      if (node.arguments.length < 2) return "#VALUE!";
+      const checkGrid = this.asGrid(node.arguments[0]);
+      const checkItems = flatten(checkGrid);
+      const criteria = asScalar(this.evaluate(node.arguments[1]));
+      if (isFormulaError(criteria)) return criteria;
+
+      const sumItems = node.arguments[2]
+        ? flatten(this.asGrid(node.arguments[2]))
+        : checkItems;
+
+      let sum = 0;
+      let count = 0;
+      for (let i = 0; i < checkItems.length; i += 1) {
+        const cell = checkItems[i];
+        const critStr = String(criteria ?? "").trim();
+        let matches = false;
+        const opMatch = critStr.match(/^([<>=!]+)\s*(.*)$/);
+        if (opMatch) {
+          const op = opMatch[1];
+          const targetNum = Number(opMatch[2]);
+          const cellNum = typeof cell === "number" ? cell : Number(cell);
+          if (!Number.isNaN(targetNum) && !Number.isNaN(cellNum)) {
+            if (op === ">") matches = cellNum > targetNum;
+            else if (op === ">=") matches = cellNum >= targetNum;
+            else if (op === "<") matches = cellNum < targetNum;
+            else if (op === "<=") matches = cellNum <= targetNum;
+            else if (op === "=" || op === "==") matches = cellNum === targetNum;
+            else if (op === "<>" || op === "!=") matches = cellNum !== targetNum;
+          } else {
+            const cellStr = String(cell ?? "").toLowerCase();
+            const targetStr = opMatch[2].toLowerCase();
+            if (op === "=" || op === "==") matches = cellStr === targetStr;
+            else if (op === "<>" || op === "!=") matches = cellStr !== targetStr;
+          }
+        } else {
+          matches = typeof criteria === "number"
+            ? Number(cell) === criteria
+            : String(cell ?? "").toLowerCase() === critStr.toLowerCase();
+        }
+
+        if (matches) {
+          count += 1;
+          const valNum = Number(sumItems[i]);
+          if (!Number.isNaN(valNum)) sum += valNum;
+        }
+      }
+
+      if (name === "COUNTIF") return count;
+      if (name === "SUMIF") return sum;
+      return count === 0 ? "#DIV/0!" : sum / count;
+    }
+
+    // Date / Time functions
+    if (name === "DATE") {
+      if (node.arguments.length !== 3) return "#VALUE!";
+      const y = asNumber(asScalar(this.evaluate(node.arguments[0])));
+      const m = asNumber(asScalar(this.evaluate(node.arguments[1])));
+      const d = asNumber(asScalar(this.evaluate(node.arguments[2])));
+      if (isFormulaError(y) || isFormulaError(m) || isFormulaError(d)) return "#VALUE!";
+      const year = Math.trunc(y);
+      const month = Math.trunc(m);
+      const day = Math.trunc(d);
+      const date = new Date(year, month - 1, day);
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    }
+
+    if (name === "TODAY") {
+      const now = new Date();
+      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    }
+
+    if (name === "NOW") {
+      const now = new Date();
+      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+    }
+
+    if (name === "YEAR" || name === "MONTH" || name === "DAY") {
+      if (node.arguments.length !== 1) return "#VALUE!";
+      const raw = asScalar(this.evaluate(node.arguments[0]));
+      if (isFormulaError(raw)) return raw;
+      const date = new Date(String(raw));
+      if (Number.isNaN(date.getTime())) return "#VALUE!";
+      if (name === "YEAR") return date.getFullYear();
+      if (name === "MONTH") return date.getMonth() + 1;
+      return date.getDate();
+    }
+
+    if (name === "WEEKDAY") {
+      if (node.arguments.length < 1 || node.arguments.length > 2) return "#VALUE!";
+      const raw = asScalar(this.evaluate(node.arguments[0]));
+      if (isFormulaError(raw)) return raw;
+      const date = new Date(String(raw));
+      if (Number.isNaN(date.getTime())) return "#VALUE!";
+      const dayOfWeek = date.getDay(); // 0 = Sun, 1 = Mon ... 6 = Sat
+      const returnType = node.arguments[1] ? asNumber(asScalar(this.evaluate(node.arguments[1]))) : 1;
+      if (returnType === 2) return dayOfWeek === 0 ? 7 : dayOfWeek; // 1 = Mon, 7 = Sun
+      return dayOfWeek + 1; // 1 = Sun, 7 = Sat
+    }
+
     const values = flatten(node.arguments.map((argument) => this.evaluate(argument)));
     const firstError = values.find(isFormulaError);
     if (firstError) return firstError;
-    const numbers = values
-      .filter((value): value is number => typeof value === "number");
+    const numbers = values.filter((value): value is number => typeof value === "number");
 
-    if (node.name === "SUM") return numbers.reduce((sum, value) => sum + value, 0);
-    if (node.name === "COUNT") return numbers.length;
-    if (node.name === "COUNTA") return values.filter((value) => value !== null && value !== "").length;
-    if (node.name === "AVERAGE") {
+    if (name === "SUM") return numbers.reduce((sum, value) => sum + value, 0);
+    if (name === "PRODUCT") return numbers.length === 0 ? 0 : numbers.reduce((prod, value) => prod * value, 1);
+    if (name === "COUNT") return numbers.length;
+    if (name === "COUNTA") return values.filter((value) => value !== null && value !== "").length;
+    if (name === "AVERAGE") {
       return numbers.length === 0
         ? "#DIV/0!"
         : numbers.reduce((sum, value) => sum + value, 0) / numbers.length;
     }
-    if (node.name === "MIN") return numbers.length === 0 ? 0 : Math.min(...numbers);
-    if (node.name === "MAX") return numbers.length === 0 ? 0 : Math.max(...numbers);
-    if (node.name === "ABS") {
+    if (name === "MIN") return numbers.length === 0 ? 0 : Math.min(...numbers);
+    if (name === "MAX") return numbers.length === 0 ? 0 : Math.max(...numbers);
+    if (name === "ABS") {
       const number = asNumber(values[0] ?? null);
       return values.length !== 1 || isFormulaError(number) ? "#VALUE!" : Math.abs(number);
     }
-    if (["ROUND", "ROUNDUP", "ROUNDDOWN"].includes(node.name)) {
+    if (name === "POWER") {
+      if (values.length !== 2) return "#VALUE!";
+      const base = asNumber(values[0]);
+      const exp = asNumber(values[1]);
+      if (isFormulaError(base) || isFormulaError(exp)) return "#VALUE!";
+      return base ** exp;
+    }
+    if (name === "SQRT") {
+      if (values.length !== 1) return "#VALUE!";
+      const num = asNumber(values[0]);
+      if (isFormulaError(num) || num < 0) return "#VALUE!";
+      return Math.sqrt(num);
+    }
+    if (name === "MOD") {
+      if (values.length !== 2) return "#VALUE!";
+      const num = asNumber(values[0]);
+      const divisor = asNumber(values[1]);
+      if (isFormulaError(num) || isFormulaError(divisor)) return "#VALUE!";
+      if (divisor === 0) return "#DIV/0!";
+      return num % divisor;
+    }
+    if (name === "INT") {
+      if (values.length !== 1) return "#VALUE!";
+      const num = asNumber(values[0]);
+      if (isFormulaError(num)) return num;
+      return Math.floor(num);
+    }
+    if (name === "TRUNC") {
+      if (values.length < 1 || values.length > 2) return "#VALUE!";
+      const num = asNumber(values[0]);
+      const digits = values[1] ? asNumber(values[1]) : 0;
+      if (isFormulaError(num) || isFormulaError(digits)) return "#VALUE!";
+      return roundWithMode(num, digits, "down");
+    }
+    if (["ROUND", "ROUNDUP", "ROUNDDOWN"].includes(name)) {
       if (values.length < 1 || values.length > 2) return "#VALUE!";
       const number = asNumber(values[0] ?? null);
       const digits = asNumber(values[1] ?? 0);
       if (isFormulaError(number)) return number;
       if (isFormulaError(digits)) return digits;
-      const mode = node.name === "ROUND" ? "nearest" : node.name === "ROUNDUP" ? "up" : "down";
+      const mode = name === "ROUND" ? "nearest" : name === "ROUNDUP" ? "up" : "down";
       return roundWithMode(number, digits, mode);
     }
-    if (node.name === "CONCAT" || node.name === "CONCATENATE") {
+
+    // Text functions
+    if (name === "CONCAT" || name === "CONCATENATE") {
       const text: string[] = [];
       for (const value of values) {
         const part = asText(value);
@@ -580,16 +924,78 @@ class SheetCalculator {
       }
       return text.join("");
     }
-    if (["LEN", "LOWER", "UPPER", "LEFT", "RIGHT", "MID"].includes(node.name)) {
+    if (name === "TRIM") {
+      if (values.length !== 1) return "#VALUE!";
+      const text = asText(values[0]);
+      return isFormulaError(text) ? text : text.trim().replace(/\s+/g, " ");
+    }
+    if (name === "EXACT") {
+      if (values.length !== 2) return "#VALUE!";
+      const t1 = asText(values[0]);
+      const t2 = asText(values[1]);
+      if (isFormulaError(t1) || isFormulaError(t2)) return "#VALUE!";
+      return t1 === t2;
+    }
+    if (name === "REPT") {
+      if (values.length !== 2) return "#VALUE!";
+      const text = asText(values[0]);
+      const count = asNumber(values[1]);
+      if (isFormulaError(text) || isFormulaError(count)) return "#VALUE!";
+      return text.repeat(Math.max(0, Math.trunc(count)));
+    }
+    if (name === "FIND" || name === "SEARCH") {
+      if (values.length < 2 || values.length > 3) return "#VALUE!";
+      const findText = asText(values[0]);
+      const withinText = asText(values[1]);
+      const start = values[2] ? asNumber(values[2]) : 1;
+      if (isFormulaError(findText) || isFormulaError(withinText) || isFormulaError(start)) return "#VALUE!";
+      const startIdx = Math.max(0, Math.trunc(start) - 1);
+      const pos = name === "FIND"
+        ? withinText.indexOf(findText, startIdx)
+        : withinText.toLowerCase().indexOf(findText.toLowerCase(), startIdx);
+      return pos >= 0 ? pos + 1 : "#VALUE!";
+    }
+    if (name === "SUBSTITUTE") {
+      if (values.length < 3 || values.length > 4) return "#VALUE!";
+      const text = asText(values[0]);
+      const oldText = asText(values[1]);
+      const newText = asText(values[2]);
+      if (isFormulaError(text) || isFormulaError(oldText) || isFormulaError(newText)) return "#VALUE!";
+      if (values[3] !== undefined) {
+        const instance = Math.trunc(asNumber(values[3]));
+        let count = 0;
+        return text.replace(new RegExp(oldText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"), (match) => {
+          count += 1;
+          return count === instance ? newText : match;
+        });
+      }
+      return text.replaceAll(oldText, newText);
+    }
+    if (name === "TEXT") {
+      if (values.length !== 2) return "#VALUE!";
+      const val = values[0];
+      const fmt = asText(values[1]);
+      if (isFormulaError(fmt)) return fmt;
+      const num = asNumber(val);
+      if (!isFormulaError(num)) {
+        if (fmt.includes("%")) return `${(num * 100).toFixed(0)}%`;
+        if (fmt.includes("#,##0.00")) return num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        if (fmt.includes("#,##0")) return num.toLocaleString("en-US", { maximumFractionDigits: 0 });
+        if (fmt.includes("0.00")) return num.toFixed(2);
+        return String(num);
+      }
+      return String(val ?? "");
+    }
+    if (["LEN", "LOWER", "UPPER", "LEFT", "RIGHT", "MID"].includes(name)) {
       const text = asText(values[0] ?? null);
       if (isFormulaError(text)) return text;
-      if (node.name === "LEN") return values.length === 1 ? text.length : "#VALUE!";
-      if (node.name === "LOWER") return values.length === 1 ? text.toLowerCase() : "#VALUE!";
-      if (node.name === "UPPER") return values.length === 1 ? text.toUpperCase() : "#VALUE!";
+      if (name === "LEN") return values.length === 1 ? text.length : "#VALUE!";
+      if (name === "LOWER") return values.length === 1 ? text.toLowerCase() : "#VALUE!";
+      if (name === "UPPER") return values.length === 1 ? text.toUpperCase() : "#VALUE!";
       const count = asNumber(values[1] ?? 1);
       if (isFormulaError(count)) return count;
-      if (node.name === "LEFT") return values.length <= 2 ? text.slice(0, Math.max(0, Math.trunc(count))) : "#VALUE!";
-      if (node.name === "RIGHT") return values.length <= 2 ? text.slice(-Math.max(0, Math.trunc(count))) : "#VALUE!";
+      if (name === "LEFT") return values.length <= 2 ? text.slice(0, Math.max(0, Math.trunc(count))) : "#VALUE!";
+      if (name === "RIGHT") return values.length <= 2 ? text.slice(-Math.max(0, Math.trunc(count))) : "#VALUE!";
       if (values.length !== 3) return "#VALUE!";
       const length = asNumber(values[2]);
       if (isFormulaError(length)) return length;

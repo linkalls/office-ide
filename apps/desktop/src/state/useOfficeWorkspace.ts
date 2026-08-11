@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   applySpreadsheetOperations,
   createTransaction,
+  type Actor,
   type SpreadsheetOperation,
   type Transaction,
 } from "@office-ide/operations";
@@ -21,6 +22,7 @@ import {
   clearWorkspaceSnapshot,
   loadWorkspaceSnapshot,
   saveWorkspaceSnapshot,
+  type StoredDocument,
 } from "./workspacePersistence";
 import type { AgentProposal } from "./agentPlanner";
 import {
@@ -42,6 +44,30 @@ interface SelectionBounds {
 const initialParse = parseSpreadsheetSource(SAMPLE_SHEET_SOURCE);
 if (!initialParse.workbook) throw new Error("Bundled spreadsheet source is invalid");
 const initialWorkbook = initialParse.workbook;
+
+export const SAMPLE_DOCUMENT_SOURCE = `# 2026年度 売上分析
+
+2026年度の売上は前年を上回り、重点地域で堅調に推移しました。
+
+## 概要
+
+1. 既存顧客の継続率を改善
+2. 新商品カテゴリを拡大
+3. 地域別の施策を最適化
+
+## 地域別売上
+
+| 地域 | 2025 | 2026 |
+|---|---:|---:|
+| 東京 | 1200 | 1450 |
+| 大阪 | 800 | 910 |
+`;
+
+const INITIAL_DOCUMENTS: StoredDocument[] = [{
+  id: "report",
+  name: "report",
+  source: SAMPLE_DOCUMENT_SOURCE,
+}];
 
 function getWorkbookDiagnostics(workbook: SpreadsheetWorkbook): Diagnostic[] {
   return parseSpreadsheetSource(serializeSpreadsheetSource(workbook)).diagnostics;
@@ -86,26 +112,49 @@ export function getSelectionBounds(selection: string): SelectionBounds | null {
 export function useOfficeWorkspace() {
   const [restoredWorkspace] = useState(() =>
     typeof window === "undefined" ? null : loadWorkspaceSnapshot(window.localStorage));
+  const initialDocuments = restoredWorkspace?.documents?.length
+    ? restoredWorkspace.documents
+    : [{ ...INITIAL_DOCUMENTS[0], source: restoredWorkspace?.documentSource ?? SAMPLE_DOCUMENT_SOURCE }];
   const [workbook, setWorkbook] = useState<SpreadsheetWorkbook>(
     restoredWorkspace?.workbook ?? initialWorkbook,
   );
   const [source, setSource] = useState(restoredWorkspace?.source ?? SAMPLE_SHEET_SOURCE);
+  const sourceBaselineRef = useRef(restoredWorkspace?.source ?? SAMPLE_SHEET_SOURCE);
+  const [documents, setDocuments] = useState<StoredDocument[]>(initialDocuments);
+  const documentSourceBaselineRef = useRef<Record<string, string>>(
+    Object.fromEntries(initialDocuments.map((document) => [document.id, document.source])),
+  );
+  const [documentSelection, setDocumentSelection] = useState({ start: 0, end: 0 });
+  const [documentUndoStack, setDocumentUndoStack] = useState<string[]>([]);
+  const [documentRedoStack, setDocumentRedoStack] = useState<string[]>([]);
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [undoStack, setUndoStack] = useState<HistoryEntry[]>([]);
   const [redoStack, setRedoStack] = useState<HistoryEntry[]>([]);
   const [activeCell, setActiveCell] = useState("C17");
   const [selection, setSelection] = useState("A2:F15");
-  const [activeView, setActiveView] = useState<WorkbenchView>("source");
+  const [secondarySelections, setSecondarySelections] = useState<string[]>([]);
+  const [activeView, setActiveView] = useState<WorkbenchView>("visual");
   const [agentOpen, setAgentOpen] = useState(true);
-  const [explorerOpen, setExplorerOpen] = useState(true);
+  // Keep the spreadsheet itself as the initial focal point. The Explorer is
+  // still available from the title bar whenever the user needs it.
+  const [explorerOpen, setExplorerOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [activeResource, setActiveResource] = useState("sales");
+  const [workspaceTitle, setWorkspaceTitle] = useState("sales-report");
+  const [openResources, setOpenResources] = useState<string[]>(["sales", "report"]);
   const [autosaveState, setAutosaveState] = useState<"saving" | "saved" | "error">(
     restoredWorkspace ? "saved" : "saving",
   );
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(restoredWorkspace?.savedAt ?? null);
   const sourceUpdateOrigin = useRef<"visual" | "source">("visual");
+  const activeDocument = documents.find((document) => document.id === activeResource) ?? documents[0]!;
+  const documentSource = activeDocument.source;
+  const documentSourceRef = useRef(documentSource);
+
+  useEffect(() => {
+    documentSourceRef.current = documentSource;
+  }, [documentSource]);
 
   const recordTransaction = useCallback((
     transaction: Transaction,
@@ -139,6 +188,7 @@ export function useOfficeWorkspace() {
     if (!extend) {
       setActiveCell(address);
       setSelection(address);
+      setSecondarySelections([]);
       return;
     }
     const anchor = parseAddress(activeCell);
@@ -148,6 +198,13 @@ export function useOfficeWorkspace() {
       `${columnIndexToLabel(Math.min(anchor.column, target.column))}${Math.min(anchor.row, target.row)}`
       + `:${columnIndexToLabel(Math.max(anchor.column, target.column))}${Math.max(anchor.row, target.row)}`,
     );
+  }, [activeCell]);
+
+  const toggleSecondarySelection = useCallback((address: string) => {
+    if (address === activeCell) return;
+    setSecondarySelections((items) => items.includes(address)
+      ? items.filter((item) => item !== address)
+      : [...items, address]);
   }, [activeCell]);
 
   const applyCellEdit = useCallback(
@@ -201,6 +258,7 @@ export function useOfficeWorkspace() {
       sourceUpdateOrigin.current = "visual";
       setWorkbook(after);
       setSource(serializeSpreadsheetSource(after));
+<<<<<<< ours
       recordTransaction(transaction, before, after);
       setDiagnostics(getWorkbookDiagnostics(after));
     },
@@ -295,13 +353,140 @@ export function useOfficeWorkspace() {
     setDiagnostics(getWorkbookDiagnostics(after));
   }, [activeCell, activeSheet.cells, activeSheet.id, canFillFormula, recordTransaction, selection, selectionBounds, workbook]);
 
-  const applyAgentProposal = useCallback((proposal: AgentProposal, agent = "Codex") => {
+  const fillSelection = useCallback((direction: "down" | "right") => {
+    const bounds = selectionBounds;
+    if (!bounds) return;
+    const hasDestination = direction === "down"
+      ? bounds.lastRow > bounds.firstRow
+      : bounds.lastColumn > bounds.firstColumn;
+    if (!hasDestination) return;
+
+    const before = workbook;
+    const sourceIndexes = Array.from({
+      length: direction === "down"
+        ? bounds.lastColumn - bounds.firstColumn + 1
+        : bounds.lastRow - bounds.firstRow + 1,
+    }, (_, index) => index);
+    const operations: SpreadsheetOperation[] = sourceIndexes.flatMap((index): SpreadsheetOperation[] => {
+      const sourceColumn = direction === "down" ? bounds.firstColumn + index : bounds.firstColumn;
+      const sourceRow = direction === "down" ? bounds.firstRow : bounds.firstRow + index;
+      const sourceAddress = `${columnIndexToLabel(sourceColumn)}${sourceRow}`;
+      const sourceCell = activeSheet.cells[sourceAddress];
+      if (!sourceCell) return [];
+      const destinationCount = direction === "down"
+        ? bounds.lastRow - bounds.firstRow
+        : bounds.lastColumn - bounds.firstColumn;
+      if (sourceCell.formula) {
+        const endColumn = direction === "down" ? sourceColumn : bounds.lastColumn;
+        const endRow = direction === "down" ? bounds.lastRow : sourceRow;
+        return [{
+          type: "fill-formula" as const,
+          sheetId: activeSheet.id,
+          range: `${sourceAddress}:${columnIndexToLabel(endColumn)}${endRow}`,
+          sourceAddress,
+          formula: sourceCell.formula,
+        }];
+      }
+      return Array.from({ length: destinationCount }, (_, offset) => ({
+        type: "set-cell-value" as const,
+        sheetId: activeSheet.id,
+        address: direction === "down"
+          ? `${columnIndexToLabel(sourceColumn)}${sourceRow + offset + 1}`
+          : `${columnIndexToLabel(sourceColumn + offset + 1)}${sourceRow}`,
+        value: sourceCell.value ?? "",
+      }));
+    });
+    if (operations.length === 0) return;
+    const after = applySpreadsheetOperations(before, operations);
+    sourceUpdateOrigin.current = "visual";
+    setWorkbook(after);
+    setSource(serializeSpreadsheetSource(after));
+    recordTransaction(createTransaction(
+      `Filled ${direction === "down" ? "down" : "right"} through ${selection}`,
+      operations,
+    ), before, after);
+    setDiagnostics(getWorkbookDiagnostics(after));
+  }, [activeSheet.cells, activeSheet.id, recordTransaction, selection, selectionBounds, workbook]);
+
+  const clearSelection = useCallback(() => {
+    const bounds = selectionBounds;
+    if (!bounds) return;
+    const addresses = new Set(secondarySelections);
+    for (let row = bounds.firstRow; row <= bounds.lastRow; row += 1) {
+      for (let column = bounds.firstColumn; column <= bounds.lastColumn; column += 1) {
+        addresses.add(`${columnIndexToLabel(column)}${row}`);
+      }
+    }
+    const operations: SpreadsheetOperation[] = [...addresses]
+      .filter((address) => {
+        const cell = activeSheet.cells[address];
+        return Boolean(cell?.formula || cell?.value !== null && cell?.value !== undefined && cell?.value !== "");
+      })
+      .map((address) => ({
+        type: "set-cell-value" as const,
+        sheetId: activeSheet.id,
+        address,
+        value: "",
+      }));
+    if (operations.length === 0) return;
+    const before = workbook;
+    const after = applySpreadsheetOperations(before, operations);
+    sourceUpdateOrigin.current = "visual";
+    setWorkbook(after);
+    setSource(serializeSpreadsheetSource(after));
+    recordTransaction(createTransaction(`Cleared ${operations.length} cells`, operations), before, after);
+    setDiagnostics(getWorkbookDiagnostics(after));
+  }, [activeSheet.cells, activeSheet.id, recordTransaction, secondarySelections, selectionBounds, workbook]);
+
+  const copySelection = useCallback(() => {
+    const bounds = selectionBounds;
+    if (!bounds) return "";
+    return Array.from({ length: bounds.lastRow - bounds.firstRow + 1 }, (_, rowOffset) => (
+      Array.from({ length: bounds.lastColumn - bounds.firstColumn + 1 }, (_, columnOffset) => {
+        const address = `${columnIndexToLabel(bounds.firstColumn + columnOffset)}${bounds.firstRow + rowOffset}`;
+        const cell = activeSheet.cells[address];
+        return cell?.formula ? `=${cell.formula}` : String(cell?.value ?? "");
+      }).join("\t")
+    )).join("\n");
+  }, [activeSheet.cells, selectionBounds]);
+
+  const pasteCells = useCallback((text: string) => {
+    const start = parseAddress(activeCell);
+    if (!start) return;
+    const rows = text.replaceAll("\r\n", "\n").replaceAll("\r", "\n").split("\n");
+    const operations: SpreadsheetOperation[] = [];
+    let lastColumn = start.column;
+    let lastRow = start.row;
+    rows.forEach((line, rowOffset) => line.split("\t").forEach((rawValue, columnOffset) => {
+      const column = start.column + columnOffset;
+      const row = start.row + rowOffset;
+      if (column > activeSheet.columnCount || row > activeSheet.rowCount) return;
+      const address = `${columnIndexToLabel(column)}${row}`;
+      lastColumn = Math.max(lastColumn, column);
+      lastRow = Math.max(lastRow, row);
+      const value = rawValue.trim();
+      operations.push(value.startsWith("=")
+        ? { type: "set-formula", sheetId: activeSheet.id, address, formula: value.slice(1) }
+        : { type: "set-cell-value", sheetId: activeSheet.id, address, value: /^-?\d+(\.\d+)?$/.test(value) ? Number(value) : value });
+    }));
+    if (operations.length === 0) return;
+    const before = workbook;
+    const after = applySpreadsheetOperations(before, operations);
+    sourceUpdateOrigin.current = "visual";
+    setWorkbook(after);
+    setSource(serializeSpreadsheetSource(after));
+    recordTransaction(createTransaction(`Pasted ${operations.length} cells`, operations), before, after);
+    setDiagnostics(getWorkbookDiagnostics(after));
+    setSelection(`${activeCell}:${columnIndexToLabel(lastColumn)}${lastRow}`);
+  }, [activeCell, activeSheet.columnCount, activeSheet.id, activeSheet.rowCount, recordTransaction, workbook]);
+
+  const applyProposal = useCallback((proposal: AgentProposal, actor: Actor) => {
     const before = workbook;
     const after = applySpreadsheetOperations(before, proposal.operations);
     const transaction = createTransaction(
       proposal.title,
       proposal.operations,
-      { type: "agent", agent },
+      actor,
     );
     sourceUpdateOrigin.current = "visual";
     setWorkbook(after);
@@ -312,6 +497,14 @@ export function useOfficeWorkspace() {
     setSelection(proposal.selection);
     return transaction.id;
   }, [recordTransaction, workbook]);
+
+  const applyAgentProposal = useCallback((proposal: AgentProposal, agent = "Codex") => (
+    applyProposal(proposal, { type: "agent", agent })
+  ), [applyProposal]);
+
+  const applyCliProposal = useCallback((proposal: AgentProposal, process = "sheetctl") => (
+    applyProposal(proposal, { type: "cli", process })
+  ), [applyProposal]);
 
   const addSheet = useCallback(() => {
     const nextNumber = workbook.sheets.reduce((maximum, sheet) => {
@@ -340,7 +533,85 @@ export function useOfficeWorkspace() {
     setActiveCell("A1");
     setSelection("A1");
     setActiveResource("sales");
+    setOpenResources((resources) => resources.includes("sales") ? resources : [...resources, "sales"]);
   }, [workbook]);
+
+  const openResource = useCallback((resource: string) => {
+    setOpenResources((resources) => resources.includes(resource) ? resources : [...resources, resource]);
+    setActiveResource(resource);
+    if (documents.some((document) => document.id === resource)) {
+      setDocumentUndoStack([]);
+      setDocumentRedoStack([]);
+    }
+  }, [documents]);
+
+  const addDocument = useCallback((name = "untitled") => {
+    const existing = new Set(documents.map((document) => document.name));
+    let candidate = name.trim() || "untitled";
+    let suffix = 2;
+    while (existing.has(candidate)) candidate = `${name || "untitled"} ${suffix++}`;
+    const document = { id: `document-${Date.now()}`, name: candidate, source: `# ${candidate}\n\n` };
+    documentSourceBaselineRef.current[document.id] = document.source;
+    setDocuments((items) => [...items, document]);
+    setOpenResources((resources) => [...resources, document.id]);
+    setActiveResource(document.id);
+    setDocumentUndoStack([]);
+    setDocumentRedoStack([]);
+  }, [documents]);
+
+  const importDocument = useCallback((name: string, source: string) => {
+    const existing = new Set(documents.map((document) => document.name));
+    const base = name.trim() || "imported document";
+    let candidate = base;
+    let suffix = 2;
+    while (existing.has(candidate)) candidate = `${base} ${suffix++}`;
+    const document = { id: `document-${Date.now()}`, name: candidate, source };
+    documentSourceBaselineRef.current[document.id] = document.source;
+    setDocuments((items) => [...items, document]);
+    setOpenResources((resources) => [...resources, document.id]);
+    setActiveResource(document.id);
+    setDocumentUndoStack([]);
+    setDocumentRedoStack([]);
+  }, [documents]);
+
+  const editDocumentSource = useCallback((nextSource: string) => {
+    const current = documentSourceRef.current;
+    if (current === nextSource) return;
+    documentSourceRef.current = nextSource;
+    setDocumentUndoStack((entries) => [...entries, current]);
+    setDocumentRedoStack([]);
+    setDocuments((items) => items.map((document) => document.id === activeDocument.id
+      ? { ...document, source: nextSource }
+      : document));
+  }, [activeDocument.id]);
+
+  const undoDocument = useCallback(() => {
+    const previous = documentUndoStack.at(-1);
+    if (previous === undefined) return;
+    setDocumentUndoStack((entries) => entries.slice(0, -1));
+    setDocumentRedoStack((entries) => [...entries, documentSource]);
+    documentSourceRef.current = previous;
+    setDocuments((items) => items.map((document) => document.id === activeDocument.id
+      ? { ...document, source: previous }
+      : document));
+  }, [activeDocument.id, documentSource, documentUndoStack]);
+
+  const redoDocument = useCallback(() => {
+    const next = documentRedoStack.at(-1);
+    if (next === undefined) return;
+    setDocumentRedoStack((entries) => entries.slice(0, -1));
+    setDocumentUndoStack((entries) => [...entries, documentSource]);
+    documentSourceRef.current = next;
+    setDocuments((items) => items.map((document) => document.id === activeDocument.id
+      ? { ...document, source: next }
+      : document));
+  }, [activeDocument.id, documentRedoStack, documentSource]);
+
+  const closeResource = useCallback((resource: string) => {
+    const remaining = openResources.filter((entry) => entry !== resource);
+    setOpenResources(remaining);
+    if (activeResource === resource) setActiveResource(remaining[0] ?? "none");
+  }, [activeResource, openResources]);
 
   const renameSheet = useCallback((sheetId: string, name: string) => {
     const cleanName = name.trim();
@@ -377,6 +648,12 @@ export function useOfficeWorkspace() {
     sourceUpdateOrigin.current = "visual";
     setWorkbook(initialWorkbook);
     setSource(SAMPLE_SHEET_SOURCE);
+    sourceBaselineRef.current = SAMPLE_SHEET_SOURCE;
+    documentSourceRef.current = SAMPLE_DOCUMENT_SOURCE;
+    setDocuments(INITIAL_DOCUMENTS);
+    documentSourceBaselineRef.current = Object.fromEntries(INITIAL_DOCUMENTS.map((document) => [document.id, document.source]));
+    setDocumentUndoStack([]);
+    setDocumentRedoStack([]);
     setDiagnostics([]);
     setHistory([]);
     setUndoStack([]);
@@ -385,8 +662,56 @@ export function useOfficeWorkspace() {
     setSelection("A2:F15");
     setAutosaveState("saving");
     setLastSavedAt(null);
+    setActiveResource("sales");
+    setOpenResources(["sales", "report"]);
   }, []);
 
+  const importWorkbook = useCallback((nextWorkbook: SpreadsheetWorkbook, report?: { path: string }) => {
+    if (nextWorkbook.sheets.length === 0) return;
+    const before = workbook;
+    const nextSource = serializeSpreadsheetSource(nextWorkbook);
+    const transaction = createTransaction(
+      `Imported XLSX${report ? `: ${report.path.split(/[/\\]/).at(-1)}` : ""}`,
+      [],
+      { type: "importer" },
+    );
+    sourceUpdateOrigin.current = "visual";
+    setWorkbook(nextWorkbook);
+    setSource(nextSource);
+    sourceBaselineRef.current = nextSource;
+    recordTransaction(transaction, before, nextWorkbook);
+    setDiagnostics(getWorkbookDiagnostics(nextWorkbook));
+    setActiveCell("A1");
+    setSelection("A1");
+    setActiveResource("sales");
+  }, [recordTransaction, workbook]);
+
+  const loadNativeWorkspace = useCallback((title: string, nextSource: string, nextDocuments: StoredDocument[]) => {
+    const result = parseSpreadsheetSource(nextSource);
+    if (!result.workbook || result.diagnostics.length) throw new Error("Workspace spreadsheet source is invalid.");
+    sourceUpdateOrigin.current = "visual";
+    setWorkspaceTitle(title);
+    setWorkbook(result.workbook);
+    setSource(nextSource);
+    sourceBaselineRef.current = nextSource;
+    const loadedDocuments = nextDocuments.length ? nextDocuments : INITIAL_DOCUMENTS;
+    setDocuments(loadedDocuments);
+    documentSourceBaselineRef.current = Object.fromEntries(loadedDocuments.map((document) => [document.id, document.source]));
+    setActiveResource("sales");
+    setOpenResources(["sales", ...(nextDocuments[0] ? [nextDocuments[0].id] : ["report"])]);
+    setDocumentUndoStack([]);
+    setDocumentRedoStack([]);
+  }, []);
+
+=======
+      setHistory((entries) => [...entries, { transaction, before, after }]);
+      setRedoStack([]);
+      setDiagnostics([]);
+    },
+    [activeCell, activeSheet.id, workbook],
+  );
+
+>>>>>>> theirs
   useEffect(() => {
     if (sourceUpdateOrigin.current !== "source") return;
     const timer = window.setTimeout(() => {
@@ -411,7 +736,7 @@ export function useOfficeWorkspace() {
     setAutosaveState("saving");
     const timer = window.setTimeout(() => {
       try {
-        const savedAt = saveWorkspaceSnapshot(window.localStorage, workbook);
+        const savedAt = saveWorkspaceSnapshot(window.localStorage, workbook, documents);
         setLastSavedAt(savedAt);
         setAutosaveState("saved");
       } catch {
@@ -419,7 +744,7 @@ export function useOfficeWorkspace() {
       }
     }, 220);
     return () => window.clearTimeout(timer);
-  }, [workbook]);
+  }, [documents, workbook]);
 
   const undo = useCallback(() => {
     const latest = undoStack.at(-1);
@@ -468,18 +793,29 @@ export function useOfficeWorkspace() {
       }
       if (modifier && event.key.toLowerCase() === "z") {
         event.preventDefault();
-        if (event.shiftKey) redo();
+        if (documents.some((document) => document.id === activeResource)) {
+          if (event.shiftKey) redoDocument();
+          else undoDocument();
+        } else if (event.shiftKey) redo();
         else undo();
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [redo, undo]);
+  }, [activeResource, documents, redo, redoDocument, undo, undoDocument]);
 
   return {
     workbook,
     activeSheet,
     source,
+    sourceBaseline: sourceBaselineRef.current,
+    documentSource,
+    documentSourceBaseline: documentSourceBaselineRef.current[activeDocument.id] ?? documentSource,
+    documentSelection,
+    documents,
+    activeDocument,
+    canUndoDocument: documentUndoStack.length > 0,
+    canRedoDocument: documentRedoStack.length > 0,
     diagnostics,
     history,
     canUndo: undoStack.length > 0,
@@ -488,38 +824,60 @@ export function useOfficeWorkspace() {
     nextRedoTransactionId: redoStack.at(-1)?.transaction.id ?? null,
     activeCell,
     selection,
+    secondarySelections,
     selectionBounds,
     canFillFormula,
     activeView,
+    workspaceTitle,
     agentOpen,
     explorerOpen,
     paletteOpen,
     activeResource,
+    openResources,
     autosaveState,
     lastSavedAt,
     applyCellEdit,
     applyCellStyle,
+<<<<<<< ours
     applyColumnWidth,
     applyRowHeight,
     applySheetStructure,
     applyFormulaFill,
+    fillSelection,
+    clearSelection,
+    copySelection,
+    pasteCells,
     applyAgentProposal,
+    applyCliProposal,
     addSheet,
+    addDocument,
+    importDocument,
     activateSheet,
     renameSheet,
     deleteSheet,
     resetWorkspace,
+    importWorkbook,
+    loadNativeWorkspace,
+=======
+>>>>>>> theirs
     editSource,
+    editDocumentSource,
+    undoDocument,
+    redoDocument,
     undo,
     redo,
     setActiveCell,
     setSelection,
+    setDocumentSelection,
     selectCell,
+    toggleSecondarySelection,
     setActiveView,
     setAgentOpen,
     setExplorerOpen,
     setPaletteOpen,
     setActiveResource,
+    openResource,
+    closeResource,
   };
 }
 

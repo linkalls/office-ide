@@ -2,6 +2,8 @@ import {
   AlignLeft,
   Bold,
   ChevronDown,
+  Download,
+  FileUp,
   Italic,
   PaintBucket,
   Percent,
@@ -10,13 +12,18 @@ import {
   Sigma,
   Undo2,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { calculateSheet, isCalculatedError } from "@office-ide/formula";
 import type { OfficeWorkspace } from "../state/useOfficeWorkspace";
+import type { CodexRuntime } from "../state/useCodexRuntime";
+import type { XlsxTransfer } from "../state/useXlsxTransfer";
 import { SpreadsheetGrid } from "./SpreadsheetGrid";
 import { WorkbenchPanel } from "./WorkbenchPanel";
 
 interface Props {
   workspace: OfficeWorkspace;
+  codexRuntime: CodexRuntime;
+  xlsx: XlsxTransfer;
 }
 
 interface FormulaInputProps {
@@ -57,8 +64,11 @@ function FormulaInput({ address, value, onCommit }: FormulaInputProps) {
   );
 }
 
-export function SpreadsheetEditor({ workspace }: Props) {
+export function SpreadsheetEditor({ workspace, codexRuntime, xlsx }: Props) {
+  const internalClipboard = useRef("");
   const cell = workspace.activeSheet.cells[workspace.activeCell];
+  const calculatedValues = useMemo(() => calculateSheet(workspace.activeSheet), [workspace.activeSheet]);
+  const activeFormulaError = calculatedValues[workspace.activeCell];
   const formulaValue = cell?.formula ? `=${cell.formula}` : String(cell?.value ?? "");
   const [, activeColumn = "A", activeRowText = "1"] = workspace.activeCell.match(/^([A-Z]+)(\d+)$/) ?? [];
   const activeRow = Number(activeRowText);
@@ -73,6 +83,29 @@ export function SpreadsheetEditor({ workspace }: Props) {
   const firstColumn = bounds?.firstColumn ?? activeColumnIndex;
   const columnCount = bounds ? bounds.lastColumn - bounds.firstColumn + 1 : 1;
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const modifier = event.ctrlKey || event.metaKey;
+      const target = event.target;
+      const isGridCell = target instanceof HTMLInputElement && target.getAttribute("aria-label")?.startsWith("Cell ");
+      if (!modifier || !isGridCell) return;
+      if (event.key.toLowerCase() === "c") {
+        event.preventDefault();
+        const text = workspace.copySelection();
+        internalClipboard.current = text;
+        void navigator.clipboard?.writeText(text).catch(() => undefined);
+      }
+      if (event.key.toLowerCase() === "v") {
+        event.preventDefault();
+        void navigator.clipboard?.readText()
+          .catch(() => internalClipboard.current)
+          .then((text) => workspace.pasteCells(text || internalClipboard.current));
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [workspace.copySelection, workspace.pasteCells]);
+
   return (
     <div className="spreadsheet-editor">
       <div className="formula-row">
@@ -86,6 +119,12 @@ export function SpreadsheetEditor({ workspace }: Props) {
           value={formulaValue}
           onCommit={(value) => workspace.applyCellEdit(workspace.activeCell, value)}
         />
+        {isCalculatedError(activeFormulaError) ? (
+          <div className="formula-error-recovery" role="alert">
+            <span>{activeFormulaError}</span>
+            <button type="button" onClick={() => workspace.applyCellEdit(workspace.activeCell, "")}>エラーを消去</button>
+          </div>
+        ) : null}
       </div>
       <div className="format-toolbar" role="toolbar" aria-label="Spreadsheet formatting">
         <button className="toolbar-button" type="button" onClick={workspace.undo} disabled={!workspace.canUndo}>
@@ -95,7 +134,7 @@ export function SpreadsheetEditor({ workspace }: Props) {
           <Redo2 size={15} />
         </button>
         <span className="toolbar-divider" />
-        <button className="toolbar-select" type="button">Inter <ChevronDown size={12} /></button>
+        <button className="toolbar-select" type="button">Yu Gothic UI <ChevronDown size={12} /></button>
         <button className="toolbar-select compact" type="button">11 <ChevronDown size={12} /></button>
         <button className="toolbar-button" type="button" aria-label="Bold" aria-pressed={cell?.style?.bold ?? false} onClick={() => workspace.applyCellStyle({ bold: !cell?.style?.bold })}><Bold size={15} /></button>
         <button className="toolbar-button" type="button" aria-label="Italic" aria-pressed={cell?.style?.italic ?? false} onClick={() => workspace.applyCellStyle({ italic: !cell?.style?.italic })}><Italic size={15} /></button>
@@ -135,6 +174,29 @@ export function SpreadsheetEditor({ workspace }: Props) {
           />
         </label>
         <span className="toolbar-divider" />
+        <button
+          className="toolbar-button xlsx-action"
+          type="button"
+          aria-label="Import XLSX workbook"
+          title="Import XLSX workbook"
+          disabled={xlsx.busy !== null}
+          onClick={() => void xlsx.importWorkbook()}
+        >
+          <FileUp size={15} />
+        </button>
+        <button
+          className="toolbar-button xlsx-action"
+          type="button"
+          aria-label="Export XLSX workbook"
+          title="Export XLSX workbook"
+          disabled={xlsx.busy !== null}
+          onClick={() => void xlsx.exportWorkbook()}
+        >
+          <Download size={15} />
+        </button>
+        {xlsx.busy ? <span className="xlsx-status">{xlsx.busy === "import" ? "XLSX を読み込み中…" : "XLSX を書き出し中…"}</span> : null}
+        {xlsx.error ? <span className="xlsx-status error" title={xlsx.error}>XLSX error</span> : null}
+        {xlsx.report ? <span className="xlsx-status" title={xlsx.report.warnings.join("\n")}>XLSX: {xlsx.report.importedCells || xlsx.report.exportedCells} cells</span> : null}
         <div className="structure-controls" role="group" aria-label="Row and column structure">
           <button
             className="structure-button"
@@ -178,7 +240,7 @@ export function SpreadsheetEditor({ workspace }: Props) {
       </div>
       <div className="editor-work-area">
         <SpreadsheetGrid workspace={workspace} />
-        <WorkbenchPanel workspace={workspace} />
+        <WorkbenchPanel workspace={workspace} codexRuntime={codexRuntime} />
       </div>
     </div>
   );
