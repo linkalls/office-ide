@@ -58,6 +58,10 @@ export function App() {
         event.preventDefault();
         setQuickOpenOpen(true);
       }
+      if (key === "j" && !event.shiftKey) {
+        event.preventDefault();
+        workspace.setAgentOpen(!workspace.agentOpen);
+      }
       if (key === "w" && !event.shiftKey && workspace.activeResource !== "none") {
         event.preventDefault();
         workspace.closeResource(workspace.activeResource);
@@ -73,7 +77,19 @@ export function App() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [nativeWorkspace.save, workspace.activeResource, workspace.closeResource, workspace.setActiveView, workspace.setPaletteOpen]);
+  }, [nativeWorkspace.save, workspace.activeResource, workspace.agentOpen, workspace.closeResource, workspace.setAgentOpen, workspace.setActiveView, workspace.setPaletteOpen]);
+
+  useEffect(() => {
+    if (!externalCompareOpen) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setExternalCompareOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [externalCompareOpen]);
 
   useEffect(() => {
     if (!isTauri()) return undefined;
