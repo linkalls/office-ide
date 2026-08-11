@@ -50,6 +50,10 @@ export function App() {
       const modifier = event.ctrlKey || event.metaKey;
       if (!modifier) return;
       const key = event.key.toLowerCase();
+      const target = event.target instanceof HTMLElement ? event.target : document.activeElement;
+      const editing = target instanceof HTMLElement
+        && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
+      if (editing && key !== "s") return;
       if (key === "s") {
         event.preventDefault();
         void nativeWorkspace.save();

@@ -588,6 +588,10 @@ export function AgentPane({ workspace, sheetctl, docctl, codexRuntime, onClose, 
           aria-label={`Ask ${activeAgent}`}
           onChange={(event) => setPrompt(event.target.value)}
           onKeyDown={(event) => {
+            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "j") {
+              event.stopPropagation();
+              return;
+            }
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
               void submit();
