@@ -13,6 +13,7 @@ interface Props {
 
 export function CommandPalette({ workspace, xlsx, docx }: Props) {
   const [query, setQuery] = useState("");
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const dialogRef = useDialogFocus<HTMLElement>(workspace.paletteOpen, () => workspace.setPaletteOpen(false), "input");
   const commands = useMemo(() => [
     { label: "Open KDL source", detail: "Workbench: Source", icon: <Braces size={15} />, run: () => workspace.setActiveView("source") },
@@ -26,6 +27,7 @@ export function CommandPalette({ workspace, xlsx, docx }: Props) {
     { label: "Create document resource", detail: "New Djot document", icon: <FileText size={15} />, run: () => workspace.addDocument() },
   ], [docx, workspace, xlsx]);
   const filtered = commands.filter((command) => command.label.toLowerCase().includes(query.toLowerCase()));
+  const safeSelectedIndex = Math.min(selectedIndex, Math.max(0, filtered.length - 1));
 
   const execute = (run: () => void) => {
     run();
@@ -41,10 +43,12 @@ export function CommandPalette({ workspace, xlsx, docx }: Props) {
             autoFocus
             placeholder="Type a command…"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => { setQuery(event.target.value); setSelectedIndex(0); }}
             onKeyDown={(event) => {
               if (event.key === "Escape") workspace.setPaletteOpen(false);
-              if (event.key === "Enter" && filtered[0]) execute(filtered[0].run);
+              if (event.key === "ArrowDown") { event.preventDefault(); setSelectedIndex((index) => Math.min(index + 1, filtered.length - 1)); }
+              if (event.key === "ArrowUp") { event.preventDefault(); setSelectedIndex((index) => Math.max(index - 1, 0)); }
+              if (event.key === "Enter" && filtered[safeSelectedIndex]) execute(filtered[safeSelectedIndex].run);
             }}
           />
           <kbd>Esc</kbd>
@@ -52,7 +56,7 @@ export function CommandPalette({ workspace, xlsx, docx }: Props) {
         <div className="palette-group-label"><Command size={12} /> COMMANDS</div>
         <div className="palette-results">
           {filtered.map((command, index) => (
-            <button key={command.label} type="button" data-selected={index === 0} onClick={() => execute(command.run)}>
+            <button key={command.label} type="button" data-selected={index === safeSelectedIndex} onClick={() => execute(command.run)}>
               {command.icon}
               <span>{command.label}</span>
               <small>{command.detail}</small>

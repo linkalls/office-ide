@@ -134,13 +134,13 @@ export function SpreadsheetEditor({ workspace, codexRuntime, xlsx }: Props) {
           <Redo2 size={15} />
         </button>
         <span className="toolbar-divider" />
-        <button className="toolbar-select" type="button">Yu Gothic UI <ChevronDown size={12} /></button>
-        <button className="toolbar-select compact" type="button">11 <ChevronDown size={12} /></button>
+        <button className="toolbar-select" type="button" disabled title="Font selection is not available yet">Yu Gothic UI <ChevronDown size={12} /></button>
+        <button className="toolbar-select compact" type="button" disabled title="Font size selection is not available yet">11 <ChevronDown size={12} /></button>
         <button className="toolbar-button" type="button" aria-label="Bold" aria-pressed={cell?.style?.bold ?? false} onClick={() => workspace.applyCellStyle({ bold: !cell?.style?.bold })}><Bold size={15} /></button>
         <button className="toolbar-button" type="button" aria-label="Italic" aria-pressed={cell?.style?.italic ?? false} onClick={() => workspace.applyCellStyle({ italic: !cell?.style?.italic })}><Italic size={15} /></button>
         <button className="toolbar-button" type="button" aria-label="Align" aria-pressed={cell?.style?.horizontalAlign === "left"} onClick={() => workspace.applyCellStyle({ horizontalAlign: cell?.style?.horizontalAlign === "left" ? "right" : "left" })}><AlignLeft size={15} /></button>
         <button className="toolbar-button" type="button" aria-label="Fill color" aria-pressed={Boolean(cell?.style?.background)} onClick={() => workspace.applyCellStyle({ background: cell?.style?.background ? "" : "#254f7d" })}><PaintBucket size={15} /></button>
-        <button className="toolbar-button" type="button"><Percent size={15} /></button>
+        <button className="toolbar-button" type="button" disabled title="Number format selection is not available yet" aria-label="Number format"><Percent size={15} /></button>
         <button
           className="toolbar-button"
           type="button"
@@ -236,7 +236,7 @@ export function SpreadsheetEditor({ workspace, codexRuntime, xlsx }: Props) {
           </button>
         </div>
         <span className="toolbar-spacer" />
-        <button className="toolbar-button" type="button"><Search size={15} /></button>
+        <button className="toolbar-button" type="button" disabled title="Use Ctrl+F to search the workspace" aria-label="Search workspace"><Search size={15} /></button>
       </div>
       <div className="editor-work-area">
         <SpreadsheetGrid workspace={workspace} />

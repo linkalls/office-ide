@@ -293,6 +293,7 @@ textarea:focus-visible {
 .toolbar-button:hover, .toolbar-select:hover { background: var(--hover); color: white; }
 .toolbar-button:disabled { opacity: 0.32; cursor: not-allowed; }
 .toolbar-button:disabled:hover { color: #aeb9c7; background: transparent; }
+.toolbar-select:disabled { opacity: .52; cursor: not-allowed; }
 .toolbar-button[aria-pressed="true"] { background: var(--accent-soft); color: #dcecff; }
 .toolbar-button:disabled { opacity: .35; cursor: default; }
 .toolbar-select { display: flex; align-items: center; justify-content: space-between; width: 94px; padding: 0 8px; }
@@ -689,6 +690,7 @@ textarea:focus-visible {
 @media (max-width: 980px) {
   .workspace-shell[data-agent-open="true"] { grid-template-columns: 190px minmax(470px, 1fr); }
   .workspace-shell[data-agent-open="true"] .agent-pane { position: fixed; z-index: 20; top: var(--chrome-height); right: 0; bottom: var(--status-height); width: min(390px, 85vw); box-shadow: -12px 0 38px rgb(0 0 0 / .38); }
+  .agent-scrim { position: fixed; z-index: 19; inset: var(--chrome-height) 0 var(--status-height); border: 0; background: rgb(0 0 0 / .48); cursor: pointer; }
   .brand { min-width: 130px; }
   .menu-button:nth-child(n+4) { display: none; }
 }

@@ -134,6 +134,7 @@ export function App() {
       >
         {workspace.explorerOpen ? <Explorer workspace={workspace} onResize={setExplorerWidth} /> : null}
         <MainEditor workspace={workspace} codexRuntime={codexRuntime} xlsx={xlsx} docx={docx} />
+        {workspace.agentOpen ? <button className="agent-scrim" type="button" aria-label="Close agent pane" onClick={() => workspace.setAgentOpen(false)} /> : null}
         {workspace.agentOpen ? <AgentPane workspace={workspace} sheetctl={sheetctl} docctl={docctl} codexRuntime={codexRuntime} onClose={() => workspace.setAgentOpen(false)} onResize={setAgentWidth} /> : null}
       </div>
       <StatusBar workspace={workspace} />

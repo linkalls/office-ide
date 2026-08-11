@@ -24,6 +24,7 @@ function matchingLines(source: string, query: string): Array<{ line: number; tex
 
 export function GlobalSearch({ onClose, workspace }: Props) {
   const [query, setQuery] = useState("");
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const dialogRef = useDialogFocus<HTMLElement>(true, onClose, "input");
   const normalized = query.trim().toLocaleLowerCase();
   const results = useMemo<SearchResult[]>(() => {
@@ -93,6 +94,7 @@ export function GlobalSearch({ onClose, workspace }: Props) {
     }
     return output.slice(0, 80);
   }, [normalized, workspace]);
+  const safeSelectedIndex = Math.min(selectedIndex, Math.max(0, results.length - 1));
 
   const select = (result: SearchResult) => {
     result.run();
@@ -110,10 +112,12 @@ export function GlobalSearch({ onClose, workspace }: Props) {
             aria-label="Search workspace"
             placeholder="Search cells, formulas, source, documents…"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => { setQuery(event.target.value); setSelectedIndex(0); }}
             onKeyDown={(event) => {
               if (event.key === "Escape") onClose();
-              if (event.key === "Enter" && results[0]) select(results[0]);
+              if (event.key === "ArrowDown") { event.preventDefault(); setSelectedIndex((index) => Math.min(index + 1, results.length - 1)); }
+              if (event.key === "ArrowUp") { event.preventDefault(); setSelectedIndex((index) => Math.max(index - 1, 0)); }
+              if (event.key === "Enter" && results[safeSelectedIndex]) select(results[safeSelectedIndex]);
             }}
           />
           <kbd>Esc</kbd>
@@ -123,7 +127,7 @@ export function GlobalSearch({ onClose, workspace }: Props) {
           {!normalized ? <p className="global-search-hint">Search across spreadsheet values, formulas, KDL, Djot, and resource names.</p> : null}
           {normalized && results.length === 0 ? <p className="global-search-hint">No matches in this workspace.</p> : null}
           {results.map((result, index) => (
-            <button key={result.id} type="button" data-selected={index === 0} onClick={() => select(result)}>
+            <button key={result.id} type="button" data-selected={index === safeSelectedIndex} onClick={() => select(result)}>
               {icon(result.icon)}
               <span>{result.label}</span>
               <small>{result.detail}</small>

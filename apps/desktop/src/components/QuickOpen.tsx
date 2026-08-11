@@ -10,6 +10,7 @@ interface Props {
 
 export function QuickOpen({ workspace, onClose }: Props) {
   const [query, setQuery] = useState("");
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const dialogRef = useDialogFocus<HTMLElement>(true, onClose, "input");
   const resources = useMemo(() => {
     const sheets = workspace.workbook.sheets.map((sheet) => ({
@@ -30,6 +31,7 @@ export function QuickOpen({ workspace, onClose }: Props) {
   }, [workspace]);
   const normalized = query.trim().toLowerCase();
   const filtered = resources.filter((resource) => !normalized || resource.label.toLowerCase().includes(normalized));
+  const safeSelectedIndex = Math.min(selectedIndex, Math.max(0, filtered.length - 1));
   const open = (resource: (typeof resources)[number]) => {
     resource.open();
     onClose();
@@ -45,10 +47,12 @@ export function QuickOpen({ workspace, onClose }: Props) {
             aria-label="Quick open resource"
             placeholder="Open a spreadsheet or document…"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => { setQuery(event.target.value); setSelectedIndex(0); }}
             onKeyDown={(event) => {
               if (event.key === "Escape") onClose();
-              if (event.key === "Enter" && filtered[0]) open(filtered[0]);
+              if (event.key === "ArrowDown") { event.preventDefault(); setSelectedIndex((index) => Math.min(index + 1, filtered.length - 1)); }
+              if (event.key === "ArrowUp") { event.preventDefault(); setSelectedIndex((index) => Math.max(index - 1, 0)); }
+              if (event.key === "Enter" && filtered[safeSelectedIndex]) open(filtered[safeSelectedIndex]);
             }}
           />
           <kbd>Esc</kbd>
@@ -56,7 +60,7 @@ export function QuickOpen({ workspace, onClose }: Props) {
         <div className="palette-group-label"><Search size={12} /> QUICK OPEN</div>
         <div className="palette-results">
           {filtered.map((resource, index) => (
-            <button key={resource.id} type="button" data-selected={index === 0} onClick={() => open(resource)}>
+            <button key={resource.id} type="button" data-selected={index === safeSelectedIndex} onClick={() => open(resource)}>
               {resource.icon}<span>{resource.label}</span><small>{resource.detail}</small>
             </button>
           ))}
