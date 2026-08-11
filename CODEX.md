@@ -1,6 +1,6 @@
 # Office IDE — Codex handoff
 
-最終更新: 2026-08-09  
+最終更新: 2026-08-11
 対象仕様: `Office IDE — Agent-first Office Suite`  
 実装基準: このファイルを含む最新の`main`
 
@@ -8,7 +8,7 @@
 
 このリポジトリは**完成版MVPではない**。現在は次の段階にある。
 
-> Phase 0〜2の主要vertical sliceに加え、XLSX/DOCX compatibility bridge、native workspace save/open・recovery、Git/PTY host、Codex app-server、Djot文書編集とdocctlを実装した状態。完成版MVPではなく、Univer置換・OOXML fidelity・外部変更監視などが残る。
+> Phase 0〜2の主要vertical sliceに加え、XLSX/DOCX compatibility bridge、native workspace save/open・recovery、Git/PTY host、Codex app-server、Djot文書編集とdocctlを実装した状態。完成版MVPではなく、Univer置換・OOXML fidelity・外部変更のmerge UIなどが残る。
 
 動作している中心経路は以下。
 
@@ -43,28 +43,16 @@ history / undo / redo
 | Phase 4 — Document Core | 🟡 | Djot source/visual editor、Document Workbench (Source/Diff)、document history、docctl、Document Skill、native workspace documents | Univer Docs、layout.kdl、stable Document IR/block IDs、rich table editing |
 | Phase 5 — DOCX | 🟡 | native importer/exporter、drag/drop、basic Djot round-trip test、compatibility report | advanced formatting、headers/footnotes/comments、opaque OOXML preservation |
 | Phase 6 — Git / External MCP | 🟡 | native Git status/diff/stage/unstage/commit UI、semantic diff surface | semantic Git diff、external MCP server |
-| Phase 0 — Foundation | 🟡 | Bun monorepo、React/Vite shell、Tauri 2/Rustの雛形、Explorer、tabs、command palette、resource-neutralなeditor shell | 実workspace作成/読込/保存、Tauri commandの実接続、Rust toolchain上でのdesktop起動確認 |
-| Phase 1 — Spreadsheet Core | 🟡 | Spreadsheet IR、KDL MVP parser/serializer、Grid/Source双方向更新、cell value/formula編集、cell styleの最小semantic operationとKDL round-trip、基本transaction、Undo/Redo | Univer Sheets、完全な数式計算、named style/row/column操作、AST-preserving patch、永続化、完全なKDL 2.0 |
-| Phase 2 — Agent Infrastructure | 🟡 | Agent pane、Claude/Codex/Cursor/Shell tabs、context表示、History/Diff/Problems/TerminalのUI surface | xterm.js、portable-pty、CLI launcher、sheetctl、local IPC、Skills、agent transaction、semantic diff実処理 |
-| Phase 3 — XLSX | ⬜ | なし | importer/exporter、compatibility report、opaque OOXML preservation |
-| Phase 4 — Document Core | ⬜ | Explorer上のdocument見本のみ | Univer Docs、Document IR、Djot、layout KDL、双方向同期、docctl、Document Skill |
-| Phase 5 — DOCX | ⬜ | なし | importer/exporter、compatibility report、opaque OOXML preservation |
-| Phase 6 — Git / External MCP | ⬜ | Source Diff風の表示surfaceのみ | Git panel、実diff/履歴連携、semantic git diff、任意MCP server |
 
 ### MVP機能別
 
 | 分野 | できること | まだできないこと |
 | --- | --- | --- |
-| Spreadsheet | sample KDLの表示、複数sheetの作成/切替/改名/削除、セル値/式、Shift range選択・相対数式フィル、四則演算・比較・参照・range・集計/論理/文字列/丸め関数、数式エラー診断、bold/italic/color/alignment、row/columnのsize・複数挿入・削除、Sourceとの双方向反映、browser autosave/recovery、Undo/Redo | Univer描画、Excel互換の完全な式評価、named style、ドラッグ選択、sheet間参照、filesystem save/load |
+| Spreadsheet | sample KDLの表示、複数sheetの作成/切替/改名/削除、セル値/式、Shift range選択・相対数式フィル、四則演算・比較・参照・range・集計/論理/文字列/丸め関数、数式エラー診断、bold/italic/color/alignment、row/columnのsize・複数挿入・削除、Sourceとの双方向反映、browser autosave/recovery、native workspace save/load、Undo/Redo | Univer描画、Excel互換の完全な式評価、named style、ドラッグ選択、sheet間参照 |
 | Document | Djot文書のVisual/Source編集、basic table、source sync、Undo/Redo、native save/load、docctl proposal | Univer Docs、layout KDL、stable Document IR/block ID |
 | Agent | Codex app-server、model/thinking、Skill injection、sheetctl/docctl proposal、persistent Shell、Claude/Cursor/Shell terminal routing、review/history | xterm.js/portable-pty、外部providerの専用chat integration、完全semantic diff |
 | IDE | Explorer、closable editor tabs、Quick Open、command palette、global search、Source/Diff/History/Problems/Terminal/Git、native workspace/recovery、external source watcher、Light/Dark/System theme | external merge UI、accessibility/visual regression suite |
 | Compatibility | XLSX/DOCX import/export、drag/drop、compatibility report、basic round-trip tests | OOXML opaque preservationとadvanced feature fidelity |
-| Spreadsheet | sample KDLの表示、セル値/式文字列の編集、bold/italic/color/alignmentの最小style編集、Sourceとの双方向反映、Undo/Redo | Univer描画、完全な式評価、named style、行列操作、複数sheet操作、ファイルsave/load |
-| Document | IDE shell内のresource表現 | Djot/Visual editor、Document IR、同期、履歴、保存 |
-| Agent | pane、tab、context barのUI | Agent process起動、PTY、prompt送信、sheetctl/docctl、Skill実行 |
-| IDE | Explorer、editor tabs、command palette、Source/Diff/History/Problems/Terminal view、responsive layout | quick open、global search、実terminal、実Git、autosave/recovery、Light/System theme |
-| Compatibility | なし | XLSX/DOCX import/exportとunsupported feature report |
 
 ## 3. 仕様上の重要な未達点
 
@@ -75,7 +63,7 @@ history / undo / redo
 - Diff: source diffと限定的semantic summaryはあるが、完全なsemantic diff engineではない。
 - Problems: KDL parseと数式構文diagnosticsの表示経路はあるが、仕様書のvalidation項目全体は未実装。
 - History: in-memoryのcell/source/Agent変更履歴。Agent attributionと最新transactionのUndo/Redoは動作するが、任意transactionへの永続的revertは未実装。
-- Explorer: Spreadsheet/Document一覧はworkspace stateと同期。Asset browserとexternal filesystem watcherは未実装。
+- Explorer: Spreadsheet/Document一覧はworkspace stateと同期。Asset browserは未実装。external filesystem watcherと外部変更の安全な採用／保持は実装済みで、merge UIが残る。
 - Tauri/Rust: workspace save/open、XLSX/DOCX、Git、shell、Codex hostをコンパイル・Rust unit test済み。
 
 仕様書のNorth Star Scenario A/Bは一部到達している。両方ともnative formatのdrag/drop、Visual/Source、review-first proposal、Undo、exportの経路があるが、Univer・完全なOOXML fidelity・Tauri windowでのend-to-end visual acceptanceは未達。
@@ -162,7 +150,7 @@ bun run qa:complete
 
 ### Codex app-server接続の実装契約
 
-この項目はPhase 2で次に実装する仕様であり、現時点では未実装。見た目だけのCodex UI、固定transcript、ANSI出力のscrapingを完成扱いにしない。
+この項目はPhase 2の実装契約。Codex UIは固定transcriptではなく、Rust host経由のapp-serverイベントとrequest/responseを表示する。残りはapprovalの視覚的な統合、再接続・複数turnの網羅テスト、schemaの完全な型置換。
 
 #### 正式な接続経路
 
