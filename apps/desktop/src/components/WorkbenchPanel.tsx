@@ -220,7 +220,7 @@ function ActivityView({ codexRuntime }: Pick<Props, "codexRuntime">) {
 function GitView({ git }: { git: ReturnType<typeof useGitWorkspace> }) {
   const [message, setMessage] = useState("");
   if (!git.desktop) return <div className="semantic-view"><p className="empty-copy">Git status is available in the Tauri desktop app.</p></div>;
-  if (git.error) return <div className="semantic-view"><p className="source-error-banner">{git.error}</p></div>;
+  if (git.error) return <div className="semantic-view"><p className="git-error-message" role="alert">{git.error}</p></div>;
   if (!git.status) return <div className="semantic-view"><p className="empty-copy">Reading Git status…</p></div>;
   if (!git.status.isRepository) return <div className="semantic-view"><p className="empty-copy">This workspace is not a Git repository.</p></div>;
   return <div className="git-view">

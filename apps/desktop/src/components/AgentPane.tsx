@@ -131,9 +131,7 @@ export function AgentPane({ workspace, sheetctl, docctl, codexRuntime, onClose, 
   // The native host exposes both sheetctl and docctl to app-server. Keep the
   // local planner only as the browser-preview fallback.
   const usesCodexRuntime = activeAgent === "Codex" && codexRuntime.isDesktop;
-  const runtimeBusy = shellBusy || usesCodexRuntime && (
-    codexRuntime.phase === "starting" || codexRuntime.phase === "running"
-  );
+  const runtimeBusy = shellBusy || (usesCodexRuntime && codexRuntime.phase !== "ready");
   const historyByTransaction = useMemo(
     () => new Map(workspace.history.map((entry) => [entry.transaction.id, entry])),
     [workspace.history],
@@ -267,7 +265,8 @@ export function AgentPane({ workspace, sheetctl, docctl, codexRuntime, onClose, 
     setMessages([]);
     setProposal(null);
     setProposalReviewOpen(false);
-    if (docctl.pending) void docctl.respond(docctl.pending.id, false);
+    if (sheetctl.pending) void sheetctl.respond(sheetctl.pending.id, false, "Dismissed by new chat");
+    if (docctl.pending) void docctl.respond(docctl.pending.id, false, "Dismissed by new chat");
     setDocumentProposal(null);
     setRecentThreads([]);
   };
@@ -312,6 +311,8 @@ export function AgentPane({ workspace, sheetctl, docctl, codexRuntime, onClose, 
             role="tab"
             key={agent}
             data-active={activeAgent === agent}
+            disabled={agent !== "Codex"}
+            title={agent === "Codex" ? undefined : `${agent} is available in the Terminal workspace`}
             onClick={() => selectAgent(agent)}
           >
             {agent}
@@ -599,11 +600,12 @@ export function AgentPane({ workspace, sheetctl, docctl, codexRuntime, onClose, 
               event.stopPropagation();
               return;
             }
-            if (event.key === "Enter" && !event.shiftKey) {
+            if (event.key === "Enter" && !event.shiftKey && !runtimeBusy) {
               event.preventDefault();
               void submit();
             }
           }}
+          disabled={runtimeBusy}
         />
         <button
           type="button"
