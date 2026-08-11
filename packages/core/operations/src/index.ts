@@ -193,7 +193,6 @@ export type SpreadsheetOperation =
       name: string;
     }
   | {
-<<<<<<< ours
       type: "add-sheet";
       sheetId: string;
       name: string;
@@ -207,13 +206,10 @@ export type SpreadsheetOperation =
       sheetId: string;
     }
   | {
-=======
->>>>>>> theirs
       type: "set-cell-style";
       sheetId: string;
       address: string;
       style: CellStyle;
-<<<<<<< ours
     }
   | {
       type: "set-column-width";
@@ -294,8 +290,6 @@ export type DocumentOperation =
   | {
       type: "add-footnote";
       footnote: import("@office-ide/document-ir").Footnote;
-=======
->>>>>>> theirs
     };
 
 export type Operation = SpreadsheetOperation | DocumentOperation;

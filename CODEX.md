@@ -36,7 +36,6 @@ history / undo / redo
 
 | 仕様書 | 状態 | 現在の実装 | 残作業 |
 | --- | --- | --- | --- |
-<<<<<<< ours
 | Phase 0 — Foundation | 🟡 | Bun monorepo、React/Vite/Tauri、Explorer、closable tabs、Quick Open、command palette、workspace directory save/open、crash recovery、drag/drop、external source watcherと安全な採用／保持 | 外部版との比較・merge UI |
 | Phase 1 — Spreadsheet Core | 🟡 | Spreadsheet IR、KDL parser/serializer、Grid/Source双方向更新、formula、Shift/非連続選択、Ctrl+矢印、fill handle、row/column resize・構造操作、Undo/Redo、autosave | Univer Sheets、Excel完全互換計算、AST-preserving patch、完全KDL 2.0 |
 | Phase 2 — Agent Infrastructure | 🟡 | resizable/closable Agent pane、persistent Rust shell、sheetctl/docctl loopback IPC、review proposal、Codex app-serverとmodel/thinking選択、Skill injection、Claude/Cursor/Shell terminal routing | xterm.js/portable-pty、Tauri window内のapproval visual suite、完全semantic diff |
@@ -44,7 +43,6 @@ history / undo / redo
 | Phase 4 — Document Core | 🟡 | Djot source/visual editor、Document Workbench (Source/Diff)、document history、docctl、Document Skill、native workspace documents | Univer Docs、layout.kdl、stable Document IR/block IDs、rich table editing |
 | Phase 5 — DOCX | 🟡 | native importer/exporter、drag/drop、basic Djot round-trip test、compatibility report | advanced formatting、headers/footnotes/comments、opaque OOXML preservation |
 | Phase 6 — Git / External MCP | 🟡 | native Git status/diff/stage/unstage/commit UI、semantic diff surface | semantic Git diff、external MCP server |
-=======
 | Phase 0 — Foundation | 🟡 | Bun monorepo、React/Vite shell、Tauri 2/Rustの雛形、Explorer、tabs、command palette、resource-neutralなeditor shell | 実workspace作成/読込/保存、Tauri commandの実接続、Rust toolchain上でのdesktop起動確認 |
 | Phase 1 — Spreadsheet Core | 🟡 | Spreadsheet IR、KDL MVP parser/serializer、Grid/Source双方向更新、cell value/formula編集、cell styleの最小semantic operationとKDL round-trip、基本transaction、Undo/Redo | Univer Sheets、完全な数式計算、named style/row/column操作、AST-preserving patch、永続化、完全なKDL 2.0 |
 | Phase 2 — Agent Infrastructure | 🟡 | Agent pane、Claude/Codex/Cursor/Shell tabs、context表示、History/Diff/Problems/TerminalのUI surface | xterm.js、portable-pty、CLI launcher、sheetctl、local IPC、Skills、agent transaction、semantic diff実処理 |
@@ -52,25 +50,21 @@ history / undo / redo
 | Phase 4 — Document Core | ⬜ | Explorer上のdocument見本のみ | Univer Docs、Document IR、Djot、layout KDL、双方向同期、docctl、Document Skill |
 | Phase 5 — DOCX | ⬜ | なし | importer/exporter、compatibility report、opaque OOXML preservation |
 | Phase 6 — Git / External MCP | ⬜ | Source Diff風の表示surfaceのみ | Git panel、実diff/履歴連携、semantic git diff、任意MCP server |
->>>>>>> theirs
 
 ### MVP機能別
 
 | 分野 | できること | まだできないこと |
 | --- | --- | --- |
-<<<<<<< ours
 | Spreadsheet | sample KDLの表示、複数sheetの作成/切替/改名/削除、セル値/式、Shift range選択・相対数式フィル、四則演算・比較・参照・range・集計/論理/文字列/丸め関数、数式エラー診断、bold/italic/color/alignment、row/columnのsize・複数挿入・削除、Sourceとの双方向反映、browser autosave/recovery、Undo/Redo | Univer描画、Excel互換の完全な式評価、named style、ドラッグ選択、sheet間参照、filesystem save/load |
 | Document | Djot文書のVisual/Source編集、basic table、source sync、Undo/Redo、native save/load、docctl proposal | Univer Docs、layout KDL、stable Document IR/block ID |
 | Agent | Codex app-server、model/thinking、Skill injection、sheetctl/docctl proposal、persistent Shell、Claude/Cursor/Shell terminal routing、review/history | xterm.js/portable-pty、外部providerの専用chat integration、完全semantic diff |
 | IDE | Explorer、closable editor tabs、Quick Open、command palette、global search、Source/Diff/History/Problems/Terminal/Git、native workspace/recovery、external source watcher、Light/Dark/System theme | external merge UI、accessibility/visual regression suite |
 | Compatibility | XLSX/DOCX import/export、drag/drop、compatibility report、basic round-trip tests | OOXML opaque preservationとadvanced feature fidelity |
-=======
 | Spreadsheet | sample KDLの表示、セル値/式文字列の編集、bold/italic/color/alignmentの最小style編集、Sourceとの双方向反映、Undo/Redo | Univer描画、完全な式評価、named style、行列操作、複数sheet操作、ファイルsave/load |
 | Document | IDE shell内のresource表現 | Djot/Visual editor、Document IR、同期、履歴、保存 |
 | Agent | pane、tab、context barのUI | Agent process起動、PTY、prompt送信、sheetctl/docctl、Skill実行 |
 | IDE | Explorer、editor tabs、command palette、Source/Diff/History/Problems/Terminal view、responsive layout | quick open、global search、実terminal、実Git、autosave/recovery、Light/System theme |
 | Compatibility | なし | XLSX/DOCX import/exportとunsupported feature report |
->>>>>>> theirs
 
 ## 3. 仕様上の重要な未達点
 

@@ -291,11 +291,8 @@ textarea:focus-visible {
 .toolbar-button, .toolbar-select { height: 27px; border: 0; border-radius: 4px; background: transparent; color: #aeb9c7; cursor: pointer; font-size: 11px; }
 .toolbar-button { width: 29px; display: grid; place-items: center; }
 .toolbar-button:hover, .toolbar-select:hover { background: var(--hover); color: white; }
-<<<<<<< ours
 .toolbar-button:disabled { opacity: 0.32; cursor: not-allowed; }
 .toolbar-button:disabled:hover { color: #aeb9c7; background: transparent; }
-=======
->>>>>>> theirs
 .toolbar-button[aria-pressed="true"] { background: var(--accent-soft); color: #dcecff; }
 .toolbar-button:disabled { opacity: .35; cursor: default; }
 .toolbar-select { display: flex; align-items: center; justify-content: space-between; width: 94px; padding: 0 8px; }

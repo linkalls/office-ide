@@ -6,12 +6,9 @@ const SOURCE = `spreadsheet version="1" {
         name "Test"
     }
     sheet "売上" {
-<<<<<<< ours
         column "B" width=20
         row 2 height=32
 
-=======
->>>>>>> theirs
         cell "A1" value="商品" {
             font bold=#true color="#ffffff"
             fill "#254f7d"
@@ -30,11 +27,8 @@ describe("spreadsheet source", () => {
     expect(result.workbook?.name).toBe("Test");
     expect(result.workbook?.sheets[0]?.cells.B2?.value).toBe(100);
     expect(result.workbook?.sheets[0]?.cells.C2?.formula).toBe("B2*2");
-<<<<<<< ours
     expect(result.workbook?.sheets[0]?.columnWidths.B).toBe(20);
     expect(result.workbook?.sheets[0]?.rowHeights[2]).toBe(32);
-=======
->>>>>>> theirs
     expect(result.workbook?.sheets[0]?.cells.A1?.style).toEqual({
       bold: true,
       italic: undefined,

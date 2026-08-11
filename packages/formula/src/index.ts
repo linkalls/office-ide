@@ -962,7 +962,9 @@ class SheetCalculator {
       const newText = asText(values[2]);
       if (isFormulaError(text) || isFormulaError(oldText) || isFormulaError(newText)) return "#VALUE!";
       if (values[3] !== undefined) {
-        const instance = Math.trunc(asNumber(values[3]));
+        const instanceValue = asNumber(values[3]);
+        if (isFormulaError(instanceValue)) return instanceValue;
+        const instance = Math.trunc(instanceValue);
         let count = 0;
         return text.replace(new RegExp(oldText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"), (match) => {
           count += 1;

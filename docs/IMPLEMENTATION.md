@@ -46,18 +46,13 @@ The grid is currently a small in-house adapter used to verify contracts and UI b
 
 ## Phase 1 formatting slice
 
-<<<<<<< ours
 Cell formatting follows the same semantic path as value edits:
-=======
-Cell formatting now follows the same semantic path as value edits:
->>>>>>> theirs
 
 ```text
 toolbar → set-cell-style operation → Spreadsheet IR → KDL → grid
 ```
 
 The supported first slice is bold, italic, foreground/background color, horizontal alignment, and number-format data. Formatting is represented as child nodes on a cell, so source edits and visual edits round-trip without hiding style state in the UI. Named styles, inheritance, borders, and the full number-format renderer are still pending.
-<<<<<<< ours
 
 ## Phase 1 row and column dimensions
 
@@ -187,5 +182,3 @@ The frontend reducer correlates thread, turn, and item IDs; merges streamed agen
 `bun run codex:schema` generates TypeScript and JSON Schema artifacts from the installed Codex CLI. With `codex-cli 0.147.0`, the generator now verifies the four command/file approval literals and updates a compact checked-in `@office-ide/codex-protocol` adapter while ignoring the broad reproducible dump.
 
 The follow-up runtime slice was verified on Ubuntu 24.04 against an existing ChatGPT login. The redacted Bun smoke completed `initialize`, `initialized`, `account/read`, ephemeral `thread/start`, read-only `turn/start`, streamed response collection, and `turn/completed`. The Rust host now rejects a missing login before reporting ready, exposes credential-free process status for WebView reload, supports `thread/resume` and `turn/interrupt`, and emits deterministic disconnected state. The frontend can reattach, reconnect, disconnect, and stop an active turn. Replayed approval requests are deduplicated by JSON-RPC ID; a successful response removes its control exactly once without assuming a non-standard resolved notification.
-=======
->>>>>>> theirs

@@ -258,7 +258,6 @@ export function useOfficeWorkspace() {
       sourceUpdateOrigin.current = "visual";
       setWorkbook(after);
       setSource(serializeSpreadsheetSource(after));
-<<<<<<< ours
       recordTransaction(transaction, before, after);
       setDiagnostics(getWorkbookDiagnostics(after));
     },
@@ -703,15 +702,6 @@ export function useOfficeWorkspace() {
     setDocumentRedoStack([]);
   }, []);
 
-=======
-      setHistory((entries) => [...entries, { transaction, before, after }]);
-      setRedoStack([]);
-      setDiagnostics([]);
-    },
-    [activeCell, activeSheet.id, workbook],
-  );
-
->>>>>>> theirs
   useEffect(() => {
     if (sourceUpdateOrigin.current !== "source") return;
     const timer = window.setTimeout(() => {
@@ -838,7 +828,6 @@ export function useOfficeWorkspace() {
     lastSavedAt,
     applyCellEdit,
     applyCellStyle,
-<<<<<<< ours
     applyColumnWidth,
     applyRowHeight,
     applySheetStructure,
@@ -858,8 +847,6 @@ export function useOfficeWorkspace() {
     resetWorkspace,
     importWorkbook,
     loadNativeWorkspace,
-=======
->>>>>>> theirs
     editSource,
     editDocumentSource,
     undoDocument,

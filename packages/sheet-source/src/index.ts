@@ -34,7 +34,6 @@ function parseCellStyle(cellNode: ReturnType<typeof findKdlChildren>[number]): C
   return Object.values(style).some((value) => value !== undefined) ? style : undefined;
 }
 
-<<<<<<< ours
 function readPositiveDimension(
   value: unknown,
   code: string,
@@ -52,8 +51,6 @@ function readPositiveDimension(
   return undefined;
 }
 
-=======
->>>>>>> theirs
 export function parseSpreadsheetSource(source: string): SheetSourceParseResult {
   const parsed = parseKdl(source);
   const diagnostics: Diagnostic[] = parsed.diagnostics.map((diagnostic) => ({

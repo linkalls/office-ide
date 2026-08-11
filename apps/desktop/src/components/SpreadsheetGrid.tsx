@@ -424,7 +424,6 @@ export function SpreadsheetGrid({ workspace }: Props) {
                     data-formula-error={isCalculatedError(calculated[address])}
                     data-header={isHeader}
                     data-total={isTotal}
-<<<<<<< ours
                     data-fill-dragging={fillDragActive}
                     onPointerMove={() => {
                       if (fillDragActive) workspace.selectCell(address, true);
@@ -438,32 +437,11 @@ export function SpreadsheetGrid({ workspace }: Props) {
                       address={address}
                       rawValue={rawValue}
                       displayValue={rendered.get(address) ?? ""}
-=======
-                    style={{
-                      backgroundColor: cell?.style?.background,
-                      color: cell?.style?.foreground,
-                    }}
-                    onClick={() => {
-                      workspace.setActiveCell(address);
-                      workspace.setSelection(address);
-                    }}
-                  >
-                    <input
-                      aria-label={`Cell ${address}`}
-                      value={rendered.get(address) ?? ""}
->>>>>>> theirs
                       style={{
                         color: cell?.style?.foreground,
                         fontWeight: cell?.style?.bold ? 700 : undefined,
                         fontStyle: cell?.style?.italic ? "italic" : undefined,
                         textAlign: cell?.style?.horizontalAlign,
-<<<<<<< ours
-=======
-                      }}
-                      onFocus={() => {
-                        workspace.setActiveCell(address);
-                        workspace.setSelection(address);
->>>>>>> theirs
                       }}
                       onSelect={(extend) => workspace.selectCell(address, extend)}
                       onToggleSelection={() => workspace.toggleSecondarySelection(address)}

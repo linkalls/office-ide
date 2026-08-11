@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import { createEmptyWorkbook } from "@office-ide/spreadsheet-ir";
-<<<<<<< ours
 import {
   applySpreadsheetOperations,
   createTransaction,
@@ -14,11 +13,6 @@ describe("spreadsheet operations", () => {
     expect(first.id).not.toBe(second.id);
   });
 
-=======
-import { applySpreadsheetOperations } from "./index";
-
-describe("spreadsheet operations", () => {
->>>>>>> theirs
   test("applies formatting without replacing cell content", () => {
     const workbook = createEmptyWorkbook();
     workbook.sheets[0]!.cells.A1 = { address: "A1", value: "Heading" };
@@ -57,7 +51,6 @@ describe("spreadsheet operations", () => {
     expect(changed.sheets[0]?.cells.B2?.value).toBe(2);
     expect(changed.sheets[0]?.cells.B2?.style).toEqual({ italic: true });
   });
-<<<<<<< ours
 
   test("applies row and column dimensions immutably", () => {
     const workbook = createEmptyWorkbook();
@@ -273,6 +266,3 @@ describe("document operations", () => {
   });
 });
 
-=======
-});
->>>>>>> theirs
