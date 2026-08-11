@@ -1,6 +1,7 @@
 import { FileCode2, FileText, Search, Sheet, Sigma } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { OfficeWorkspace } from "../state/useOfficeWorkspace";
+import { useDialogFocus } from "../hooks/useDialogFocus";
 
 interface Props {
   onClose: () => void;
@@ -23,6 +24,7 @@ function matchingLines(source: string, query: string): Array<{ line: number; tex
 
 export function GlobalSearch({ onClose, workspace }: Props) {
   const [query, setQuery] = useState("");
+  const dialogRef = useDialogFocus<HTMLElement>(true, onClose, "input");
   const normalized = query.trim().toLocaleLowerCase();
   const results = useMemo<SearchResult[]>(() => {
     if (!normalized) return [];
@@ -100,7 +102,7 @@ export function GlobalSearch({ onClose, workspace }: Props) {
 
   return (
     <div className="palette-backdrop" role="presentation" onMouseDown={onClose}>
-      <section className="command-palette global-search" role="dialog" aria-label="Global search" onMouseDown={(event) => event.stopPropagation()}>
+      <section ref={dialogRef} className="command-palette global-search" role="dialog" aria-modal="true" aria-label="Global search" tabIndex={-1} onMouseDown={(event) => event.stopPropagation()}>
         <div className="palette-input-row">
           <Search size={17} />
           <input

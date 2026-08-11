@@ -1,6 +1,7 @@
 import { FileText, Search, Sheet } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { OfficeWorkspace } from "../state/useOfficeWorkspace";
+import { useDialogFocus } from "../hooks/useDialogFocus";
 
 interface Props {
   workspace: OfficeWorkspace;
@@ -9,6 +10,7 @@ interface Props {
 
 export function QuickOpen({ workspace, onClose }: Props) {
   const [query, setQuery] = useState("");
+  const dialogRef = useDialogFocus<HTMLElement>(true, onClose, "input");
   const resources = useMemo(() => {
     const sheets = workspace.workbook.sheets.map((sheet) => ({
       id: sheet.id,
@@ -35,7 +37,7 @@ export function QuickOpen({ workspace, onClose }: Props) {
 
   return (
     <div className="palette-backdrop" role="presentation" onMouseDown={onClose}>
-      <section className="command-palette" role="dialog" aria-label="Quick open" onMouseDown={(event) => event.stopPropagation()}>
+      <section ref={dialogRef} className="command-palette" role="dialog" aria-modal="true" aria-label="Quick open" tabIndex={-1} onMouseDown={(event) => event.stopPropagation()}>
         <div className="palette-input-row">
           <Search size={17} />
           <input

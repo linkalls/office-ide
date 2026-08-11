@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import type { OfficeWorkspace } from "../state/useOfficeWorkspace";
 import type { XlsxTransfer } from "../state/useXlsxTransfer";
 import type { useDocxTransfer } from "../state/useDocxTransfer";
+import { useDialogFocus } from "../hooks/useDialogFocus";
 
 interface Props {
   workspace: OfficeWorkspace;
@@ -12,6 +13,7 @@ interface Props {
 
 export function CommandPalette({ workspace, xlsx, docx }: Props) {
   const [query, setQuery] = useState("");
+  const dialogRef = useDialogFocus<HTMLElement>(workspace.paletteOpen, () => workspace.setPaletteOpen(false), "input");
   const commands = useMemo(() => [
     { label: "Open KDL source", detail: "Workbench: Source", icon: <Braces size={15} />, run: () => workspace.setActiveView("source") },
     { label: "Open semantic diff", detail: "Workbench: Diff", icon: <FileDiff size={15} />, run: () => workspace.setActiveView("diff") },
@@ -32,7 +34,7 @@ export function CommandPalette({ workspace, xlsx, docx }: Props) {
 
   return (
     <div className="palette-backdrop" role="presentation" onMouseDown={() => workspace.setPaletteOpen(false)}>
-      <section className="command-palette" role="dialog" aria-label="Command palette" onMouseDown={(event) => event.stopPropagation()}>
+      <section ref={dialogRef} className="command-palette" role="dialog" aria-modal="true" aria-label="Command palette" tabIndex={-1} onMouseDown={(event) => event.stopPropagation()}>
         <div className="palette-input-row">
           <Search size={17} />
           <input

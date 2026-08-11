@@ -17,6 +17,7 @@ import { useDocxTransfer } from "./state/useDocxTransfer";
 import { useNativeWorkspace } from "./state/useNativeWorkspace";
 import { useDocctlBridge } from "./state/useDocctlBridge";
 import { useAppTheme } from "./state/useAppTheme";
+import { useDialogFocus } from "./hooks/useDialogFocus";
 
 function readPaneWidth(key: string, fallback: number, minimum: number, maximum: number): number {
   const value = Number(window.localStorage.getItem(key));
@@ -37,6 +38,9 @@ export function App() {
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const [quickOpenOpen, setQuickOpenOpen] = useState(false);
   const [externalCompareOpen, setExternalCompareOpen] = useState(false);
+  const recoveryDialogRef = useDialogFocus<HTMLDivElement>(Boolean(nativeWorkspace.recovery), () => undefined, "button");
+  const externalChangeDialogRef = useDialogFocus<HTMLDivElement>(Boolean(nativeWorkspace.externalChange) && !externalCompareOpen, nativeWorkspace.keepLocalChanges, "button");
+  const externalCompareDialogRef = useDialogFocus<HTMLElement>(externalCompareOpen, () => setExternalCompareOpen(false), "button");
 
   useEffect(() => { window.localStorage.setItem("office-ide.agent-width", String(agentWidth)); }, [agentWidth]);
   useEffect(() => { window.localStorage.setItem("office-ide.explorer-width", String(explorerWidth)); }, [explorerWidth]);
@@ -132,12 +136,12 @@ export function App() {
       {workspace.paletteOpen ? <CommandPalette workspace={workspace} xlsx={xlsx} docx={docx} /> : null}
       {quickOpenOpen ? <QuickOpen workspace={workspace} onClose={() => setQuickOpenOpen(false)} /> : null}
       {globalSearchOpen ? <GlobalSearch workspace={workspace} onClose={() => setGlobalSearchOpen(false)} /> : null}
-      {nativeWorkspace.recovery ? <div className="recovery-dialog" role="dialog" aria-label="Crash recovery"><strong>Unsaved changes from the previous session were found.</strong><span>{nativeWorkspace.recovery.title}.office can be restored before continuing.</span><div><button type="button" onClick={() => void nativeWorkspace.restoreRecovery()}>Restore</button><button type="button" onClick={() => void nativeWorkspace.discardRecovery()}>Discard</button></div></div> : null}
-      {nativeWorkspace.externalChange ? <div className="recovery-dialog" role="dialog" aria-label="External source conflict"><strong>Source changed outside Office IDE.</strong><span>{nativeWorkspace.externalChange.path.split(/[/\\]/).at(-1)} changed while local edits are unsaved.</span><div><button type="button" onClick={() => setExternalCompareOpen(true)}>Compare</button><button type="button" onClick={() => void nativeWorkspace.useExternalChange()}>Use external</button><button type="button" onClick={nativeWorkspace.keepLocalChanges}>Keep local</button></div></div> : null}
+      {nativeWorkspace.recovery ? <div ref={recoveryDialogRef} className="recovery-dialog" role="alertdialog" aria-modal="true" aria-labelledby="recovery-title" tabIndex={-1}><strong id="recovery-title">Unsaved changes from the previous session were found.</strong><span>{nativeWorkspace.recovery.title}.office can be restored before continuing.</span><div><button type="button" onClick={() => void nativeWorkspace.restoreRecovery()}>Restore</button><button type="button" onClick={() => void nativeWorkspace.discardRecovery()}>Discard</button></div></div> : null}
+      {nativeWorkspace.externalChange && !externalCompareOpen ? <div ref={externalChangeDialogRef} className="recovery-dialog" role="alertdialog" aria-modal="true" aria-labelledby="external-change-title" tabIndex={-1}><strong id="external-change-title">Source changed outside Office IDE.</strong><span>{nativeWorkspace.externalChange.path.split(/[/\\]/).at(-1)} changed while local edits are unsaved.</span><div><button type="button" onClick={() => setExternalCompareOpen(true)}>Compare</button><button type="button" onClick={() => void nativeWorkspace.useExternalChange()}>Use external</button><button type="button" onClick={nativeWorkspace.keepLocalChanges}>Keep local</button></div></div> : null}
       {nativeWorkspace.externalChange && externalCompareOpen ? (
         <div className="external-compare-backdrop" role="presentation" onMouseDown={() => setExternalCompareOpen(false)}>
-          <section className="external-compare" role="dialog" aria-modal="true" aria-label="Compare external source change" onMouseDown={(event) => event.stopPropagation()}>
-            <header><div><strong>External change comparison</strong><span>Choose which workspace source to keep.</span></div><button type="button" aria-label="Close comparison" onClick={() => setExternalCompareOpen(false)}>×</button></header>
+          <section ref={externalCompareDialogRef} className="external-compare" role="dialog" aria-modal="true" aria-labelledby="external-compare-title" tabIndex={-1} onMouseDown={(event) => event.stopPropagation()}>
+            <header><div><strong id="external-compare-title">External change comparison</strong><span>Choose which workspace source to keep.</span></div><button type="button" aria-label="Close comparison" onClick={() => setExternalCompareOpen(false)}>×</button></header>
             <div className="external-compare-summary"><span>Local: {workspace.documents.length} documents</span><span>External: {nativeWorkspace.externalChange.external.documents.length} documents</span></div>
             <div className="external-compare-columns">
               <article><strong>Local unsaved source</strong><pre>{workspace.source}</pre></article>
