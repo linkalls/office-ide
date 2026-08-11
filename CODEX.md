@@ -8,7 +8,7 @@
 
 このリポジトリは**完成版MVPではない**。現在は次の段階にある。
 
-> Phase 0の大部分を組み、Phase 1の編集・range選択・数式フィル・複数sheet・autosave recovery・構造操作・基本数式計算に加え、Phase 2のreview-first Agent transaction境界を自作gridで検証した状態。
+> Phase 0〜2の主要vertical sliceに加え、XLSX/DOCX compatibility bridge、native workspace save/open・recovery、Git/PTY host、Codex app-server、Djot文書編集とdocctlを実装した状態。完成版MVPではなく、Univer置換・OOXML fidelity・外部変更監視などが残る。
 
 動作している中心経路は以下。
 
@@ -36,37 +36,55 @@ history / undo / redo
 
 | 仕様書 | 状態 | 現在の実装 | 残作業 |
 | --- | --- | --- | --- |
-| Phase 0 — Foundation | 🟡 | Bun monorepo、React/Vite shell、Tauri 2/Rustの雛形、Explorer、tabs、command palette、resource-neutralなeditor shell、browser local autosave/recovery | 実workspace directoryの作成/読込/保存、Tauri commandの実接続、Rust toolchain上でのdesktop起動確認 |
-| Phase 1 — Spreadsheet Core | 🟡 | Spreadsheet IR、stable sheet ID、複数sheet lifecycle、KDL MVP parser/serializer、Grid/Source双方向更新、draft確定型cell/formula編集、Shift range選択、相対数式フィル、cell style、row/columnのsize・複数挿入・削除semantic operation、A1数式参照shift、基本数式engine、構文診断、version付きautosave、基本transaction、Undo/Redo | Univer Sheets、Excel互換の完全な数式計算、named style、ドラッグ選択、AST-preserving patch、filesystem永続化、完全なKDL 2.0 |
-| Phase 2 — Agent Infrastructure | 🟡 | Agent pane、Claude/Codex/Cursor/Shell tabs、context表示、local planner、proposal review、Agent attribution、append-only History、Agent card lifecycle同期、Rust所有のCodex app-server JSONL host、認証gate、initialize/thread start+resume/turn start+interrupt、host reattach/reconnect、frontend event reducer、実server request由来の4択approval UI、0.147.0 generated approval adapter、signed-in real turn smoke | Tauri window内の実approval round-trip、saved thread picker、Activity view、他providerのxterm.js/portable-pty、sheetctl、local IPC、Skills、完全なsemantic diff |
+<<<<<<< ours
+| Phase 0 — Foundation | 🟡 | Bun monorepo、React/Vite/Tauri、Explorer、closable tabs、Quick Open、command palette、workspace directory save/open、crash recovery、drag/drop、external source watcherと安全な採用／保持 | 外部版との比較・merge UI |
+| Phase 1 — Spreadsheet Core | 🟡 | Spreadsheet IR、KDL parser/serializer、Grid/Source双方向更新、formula、Shift/非連続選択、Ctrl+矢印、fill handle、row/column resize・構造操作、Undo/Redo、autosave | Univer Sheets、Excel完全互換計算、AST-preserving patch、完全KDL 2.0 |
+| Phase 2 — Agent Infrastructure | 🟡 | resizable/closable Agent pane、persistent Rust shell、sheetctl/docctl loopback IPC、review proposal、Codex app-serverとmodel/thinking選択、Skill injection、Claude/Cursor/Shell terminal routing | xterm.js/portable-pty、Tauri window内のapproval visual suite、完全semantic diff |
+| Phase 3 — XLSX | 🟡 | native importer/exporter、drag/drop、compatibility report、values/formulas/basic styles/dimensions/frozen panes round-trip test | merged cells、charts、drawings、macros、tables、validation、conditional formatting、opaque OOXML preservation |
+| Phase 4 — Document Core | 🟡 | Djot source/visual editor、Document Workbench (Source/Diff)、document history、docctl、Document Skill、native workspace documents | Univer Docs、layout.kdl、stable Document IR/block IDs、rich table editing |
+| Phase 5 — DOCX | 🟡 | native importer/exporter、drag/drop、basic Djot round-trip test、compatibility report | advanced formatting、headers/footnotes/comments、opaque OOXML preservation |
+| Phase 6 — Git / External MCP | 🟡 | native Git status/diff/stage/unstage/commit UI、semantic diff surface | semantic Git diff、external MCP server |
+=======
+| Phase 0 — Foundation | 🟡 | Bun monorepo、React/Vite shell、Tauri 2/Rustの雛形、Explorer、tabs、command palette、resource-neutralなeditor shell | 実workspace作成/読込/保存、Tauri commandの実接続、Rust toolchain上でのdesktop起動確認 |
+| Phase 1 — Spreadsheet Core | 🟡 | Spreadsheet IR、KDL MVP parser/serializer、Grid/Source双方向更新、cell value/formula編集、cell styleの最小semantic operationとKDL round-trip、基本transaction、Undo/Redo | Univer Sheets、完全な数式計算、named style/row/column操作、AST-preserving patch、永続化、完全なKDL 2.0 |
+| Phase 2 — Agent Infrastructure | 🟡 | Agent pane、Claude/Codex/Cursor/Shell tabs、context表示、History/Diff/Problems/TerminalのUI surface | xterm.js、portable-pty、CLI launcher、sheetctl、local IPC、Skills、agent transaction、semantic diff実処理 |
 | Phase 3 — XLSX | ⬜ | なし | importer/exporter、compatibility report、opaque OOXML preservation |
 | Phase 4 — Document Core | ⬜ | Explorer上のdocument見本のみ | Univer Docs、Document IR、Djot、layout KDL、双方向同期、docctl、Document Skill |
 | Phase 5 — DOCX | ⬜ | なし | importer/exporter、compatibility report、opaque OOXML preservation |
 | Phase 6 — Git / External MCP | ⬜ | Source Diff風の表示surfaceのみ | Git panel、実diff/履歴連携、semantic git diff、任意MCP server |
+>>>>>>> theirs
 
 ### MVP機能別
 
 | 分野 | できること | まだできないこと |
 | --- | --- | --- |
+<<<<<<< ours
 | Spreadsheet | sample KDLの表示、複数sheetの作成/切替/改名/削除、セル値/式、Shift range選択・相対数式フィル、四則演算・比較・参照・range・集計/論理/文字列/丸め関数、数式エラー診断、bold/italic/color/alignment、row/columnのsize・複数挿入・削除、Sourceとの双方向反映、browser autosave/recovery、Undo/Redo | Univer描画、Excel互換の完全な式評価、named style、ドラッグ選択、sheet間参照、filesystem save/load |
+| Document | Djot文書のVisual/Source編集、basic table、source sync、Undo/Redo、native save/load、docctl proposal | Univer Docs、layout KDL、stable Document IR/block ID |
+| Agent | Codex app-server、model/thinking、Skill injection、sheetctl/docctl proposal、persistent Shell、Claude/Cursor/Shell terminal routing、review/history | xterm.js/portable-pty、外部providerの専用chat integration、完全semantic diff |
+| IDE | Explorer、closable editor tabs、Quick Open、command palette、global search、Source/Diff/History/Problems/Terminal/Git、native workspace/recovery、external source watcher、Light/Dark/System theme | external merge UI、accessibility/visual regression suite |
+| Compatibility | XLSX/DOCX import/export、drag/drop、compatibility report、basic round-trip tests | OOXML opaque preservationとadvanced feature fidelity |
+=======
+| Spreadsheet | sample KDLの表示、セル値/式文字列の編集、bold/italic/color/alignmentの最小style編集、Sourceとの双方向反映、Undo/Redo | Univer描画、完全な式評価、named style、行列操作、複数sheet操作、ファイルsave/load |
 | Document | IDE shell内のresource表現 | Djot/Visual editor、Document IR、同期、履歴、保存 |
-| Agent | pane、tab、context bar、自然言語4レシピのlocal planning、現在値に応じた行抽出/地域別集計sheet生成、適用前proposal review、Agent transaction、append-only History attribution、Undo時REVERTED/Redo時APPLIED | 外部LLM/Agent process起動、PTY、Chat/Terminal二層表示、任意prompt、sheetctl/docctl、Skill実行 |
+| Agent | pane、tab、context barのUI | Agent process起動、PTY、prompt送信、sheetctl/docctl、Skill実行 |
 | IDE | Explorer、editor tabs、command palette、Source/Diff/History/Problems/Terminal view、responsive layout | quick open、global search、実terminal、実Git、autosave/recovery、Light/System theme |
 | Compatibility | なし | XLSX/DOCX import/exportとunsupported feature report |
+>>>>>>> theirs
 
 ## 3. 仕様上の重要な未達点
 
 次の見た目は存在するが、backendや実データ処理はまだ接続されていない。
 
-- Terminal: UI surfaceのみ。xterm.jsとPTY transportは未実装。
-- Agent tabs: browser previewではlocal plannerのreview/apply経路が動作する。Tauri desktop向けにはCodex app-server process/JSONL/event reducer/approval UIの接続sliceを実装済みだが、この環境にCodex/Rustがなく実機smoke未完了。接続失敗時は明示errorにし、local plannerへ黙ってfallbackしない。
-- Diff: 表示デモ。source/semantic diff engineではない。
+- Terminal: Rust所有のpersistent shellは実装済み。xterm.js/portable-ptyへの置換は未実装。
+- Agent tabs: browser previewではlocal plannerのreview/apply経路、Tauri desktopではCodex app-server/Skill injectionとShell launcherが動く。Codexのsigned-in turn smokeは通過済み。Tauri window内のapproval visual integrationは未整備。
+- Diff: source diffと限定的semantic summaryはあるが、完全なsemantic diff engineではない。
 - Problems: KDL parseと数式構文diagnosticsの表示経路はあるが、仕様書のvalidation項目全体は未実装。
 - History: in-memoryのcell/source/Agent変更履歴。Agent attributionと最新transactionのUndo/Redoは動作するが、任意transactionへの永続的revertは未実装。
-- Explorer: Spreadsheet一覧はWorkbook IRと同期。Document/Assetはsampleで、filesystem-backed workspaceではない。
-- Tauri/Rust: sourceとcrate構成はあるが、Rust compilerがない環境だったためcompile未確認。
+- Explorer: Spreadsheet/Document一覧はworkspace stateと同期。Asset browserとexternal filesystem watcherは未実装。
+- Tauri/Rust: workspace save/open、XLSX/DOCX、Git、shell、Codex hostをコンパイル・Rust unit test済み。
 
-仕様書のNorth Star Scenario A/Bはいずれも未達。現状はScenario Aの「KDL source ↔ spreadsheet visual ↔ Undo」のごく一部だけを、sample dataと自作gridで確認できる。
+仕様書のNorth Star Scenario A/Bは一部到達している。両方ともnative formatのdrag/drop、Visual/Source、review-first proposal、Undo、exportの経路があるが、Univer・完全なOOXML fidelity・Tauri windowでのend-to-end visual acceptanceは未達。
 
 ## 4. 主要ファイル
 
@@ -171,6 +189,19 @@ Codex runtime
 - 認証はローカルCodexの既存loginを使う。Office IDEへOpenAI API key入力欄を追加せず、tokenをlog、History、frontend state、workspaceへ保存しない。
 - Codexが未install、未login、protocol不一致、handshake timeout、process exitの場合は明示的なerror stateを表示する。local plannerへ黙ってfallbackしてCodexが動いたように見せない。
 
+#### sheetctl capability
+
+DesktopのCodex app-server起動時だけ、Rust hostは短命の`SHEETCTL_ENDPOINT`と`SHEETCTL_TOKEN`を子プロセス環境へ渡す。これらをWebView、KDL、History、prompt、ログへ出してはならない。Codexのsandbox内では次の形式でCLIを使える。
+
+```bash
+cargo run -q -p sheetctl -- context
+cargo run -q -p sheetctl -- range A1:F10
+cargo run -q -p sheetctl -- cell set B2 100
+cargo run -q -p sheetctl -- formula set G2 '=ROUND(C2/D2,0)'
+```
+
+`sheetctl context`と最大1,000セルの`sheetctl range A1:F10`はread-only JSONを返す。変更コマンドだけがloopback/token認証でOffice IDEへ要求を送り、Workbookを直接変更しない。変更要求は必ずProposalカードで停止し、Apply/DismissでCLIへ結果が返る。配布版のsidecar packagingは次のdesktop packaging sliceで追加する。
+
 #### Chat / Terminalの責務
 
 - **Codex Chat**はapp-serverの構造化eventをOffice IDE native UIへ投影する正式surface。Codex AppやVS Code extensionと同じrich-client方式を使い、Codex画面へ独自UIを重ねない。
@@ -248,9 +279,9 @@ bun run tauri dev
 - formula engineは独自subset。集計、論理、文字列、丸めの主要関数と相対fillには対応したが、Excel完全互換、日付、配列、named range、sheet間参照は未実装。
 - named style、継承、border、number-format rendererは未実装。
 - version付きbrowser autosave/recoveryはあるが、filesystem persistenceとworkspace pickerは未実装。
-- UIはdark themeのみ。
+- UIはLight/Dark/System themeを選択・保存できる。
 - Agent plannerは平均単価/税込売上/売上しきい値強調/地域別集計sheetの4レシピに限定した決定的rule engineで、LLMや実CLIではない。PTY Agentと承認境界の設計は`docs/AGENT-RUNTIME.md`に固定済み。
-- unit testsはformula/sheet-source/operations/persistence/agent-planner/history/Codex runtime reducerの47件。`bun run codex:smoke --turn`は実CLIのread-only ephemeral turnを検証する。Playwright smoke QAとREADME demo収録は`bun run demo:record`を毎回の必須完了ゲートとして実行する。Tauri window内のapproval/exit visual integration suiteは未整備。
+- unit testsはformula/sheet-source/operations/persistence/agent-planner/history/Codex runtime reducer/document plannerを含む。`bun run codex:smoke --turn`は実CLIのread-only ephemeral turnを検証する。`bun run qa:complete`はtypecheck/tests/build/demo QAを通す。Tauri window内のapproval/exit visual integration suiteは未整備。
 
 ## 9. Codexへの作業ルール
 

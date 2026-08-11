@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -13,6 +14,23 @@ const VIDEO_PATH = resolve(ROOT, "docs/media/office-ide-agent-demo.mp4");
 const REVIEW_IMAGE_PATH = resolve(ROOT, "docs/images/office-ide-agent-review.png");
 const APPLIED_IMAGE_PATH = resolve(ROOT, "docs/images/office-ide-agent-applied.png");
 const REVERTED_IMAGE_PATH = resolve(ROOT, "docs/images/office-ide-agent-reverted.png");
+
+async function resolveBrowserExecutable(): Promise<string> {
+  // @sparticuz/chromium packages a Linux Lambda binary. On Windows, use the
+  // installed Chrome/Edge instead of asking Playwright to spawn that ELF file.
+  if (process.platform === "win32") {
+    const candidates = [
+      join(process.env.ProgramFiles ?? "C:\\Program Files", "Google", "Chrome", "Application", "chrome.exe"),
+      join(process.env["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)", "Google", "Chrome", "Application", "chrome.exe"),
+      join(process.env.LOCALAPPDATA ?? "", "Google", "Chrome", "Application", "chrome.exe"),
+      join(process.env.ProgramFiles ?? "C:\\Program Files", "Microsoft", "Edge", "Application", "msedge.exe"),
+    ];
+    const installedBrowser = candidates.find(existsSync);
+    if (installedBrowser) return installedBrowser;
+    throw new Error("Playwright video QA requires an installed Chrome or Edge browser on Windows");
+  }
+  return chromium.executablePath();
+}
 
 const frameDirectory = await mkdtemp(join(tmpdir(), "office-ide-demo-"));
 let frame = 0;
@@ -333,9 +351,11 @@ async function captureCleanProductScreenshot(page: Page, path: string): Promise<
 try {
   await waitForServer();
   browser = await playwrightChromium.launch({
-    executablePath: await chromium.executablePath(),
+    executablePath: await resolveBrowserExecutable(),
     headless: true,
-    args: chromium.args,
+    // Lambda-specific switches such as --single-process prevent desktop Chrome
+    // from completing the DevTools-pipe handshake on Windows.
+    args: process.platform === "win32" ? [] : chromium.args,
   });
   const page = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: DEVICE_SCALE_FACTOR });
   const messages: Array<{ type: string; text: string }> = [];

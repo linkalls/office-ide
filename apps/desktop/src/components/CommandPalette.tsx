@@ -1,20 +1,28 @@
-import { Braces, Bot, Command, FilePlus2, PanelRight, Search, TerminalSquare } from "lucide-react";
+import { Braces, Bot, Command, Download, FileDiff, FilePlus2, FileText, PanelRight, Search, TerminalSquare } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { OfficeWorkspace } from "../state/useOfficeWorkspace";
+import type { XlsxTransfer } from "../state/useXlsxTransfer";
+import type { useDocxTransfer } from "../state/useDocxTransfer";
 
 interface Props {
   workspace: OfficeWorkspace;
+  xlsx: XlsxTransfer;
+  docx: ReturnType<typeof useDocxTransfer>;
 }
 
-export function CommandPalette({ workspace }: Props) {
+export function CommandPalette({ workspace, xlsx, docx }: Props) {
   const [query, setQuery] = useState("");
   const commands = useMemo(() => [
     { label: "Open KDL source", detail: "Workbench: Source", icon: <Braces size={15} />, run: () => workspace.setActiveView("source") },
+    { label: "Open semantic diff", detail: "Workbench: Diff", icon: <FileDiff size={15} />, run: () => workspace.setActiveView("diff") },
+    { label: "Export as XLSX", detail: "Spreadsheet", icon: <Download size={15} />, run: () => void xlsx.exportWorkbook() },
+    { label: "Export as DOCX", detail: "Active document", icon: <Download size={15} />, run: () => void docx.exportDocx(workspace.documentSource) },
     { label: "Toggle agent pane", detail: "Ctrl+J", icon: <PanelRight size={15} />, run: () => workspace.setAgentOpen(!workspace.agentOpen) },
     { label: "Start Codex terminal", detail: "Agent: Codex", icon: <Bot size={15} />, run: () => workspace.setAgentOpen(true) },
     { label: "Open integrated terminal", detail: "Workbench: Terminal", icon: <TerminalSquare size={15} />, run: () => workspace.setActiveView("terminal") },
-    { label: "Create spreadsheet resource", detail: "New resource", icon: <FilePlus2 size={15} />, run: () => workspace.setActiveResource("sales") },
-  ], [workspace]);
+    { label: "Create spreadsheet resource", detail: "New worksheet", icon: <FilePlus2 size={15} />, run: () => workspace.addSheet() },
+    { label: "Create document resource", detail: "New Djot document", icon: <FileText size={15} />, run: () => workspace.addDocument() },
+  ], [docx, workspace, xlsx]);
   const filtered = commands.filter((command) => command.label.toLowerCase().includes(query.toLowerCase()));
 
   const execute = (run: () => void) => {

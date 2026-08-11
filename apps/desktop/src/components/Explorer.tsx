@@ -6,11 +6,12 @@ import {
   Plus,
   Sheet,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import type { OfficeWorkspace } from "../state/useOfficeWorkspace";
 
 interface Props {
   workspace: OfficeWorkspace;
+  onResize: (width: number) => void;
 }
 
 interface ResourceRowProps {
@@ -36,9 +37,20 @@ function ResourceRow({ icon, name, active, muted, onClick }: ResourceRowProps) {
   );
 }
 
-export function Explorer({ workspace }: Props) {
+export function Explorer({ workspace, onResize }: Props) {
+  const beginResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const update = (move: PointerEvent) => onResize(Math.min(500, Math.max(180, move.clientX)));
+    const stop = () => {
+      window.removeEventListener("pointermove", update);
+      window.removeEventListener("pointerup", stop);
+    };
+    window.addEventListener("pointermove", update);
+    window.addEventListener("pointerup", stop, { once: true });
+  };
   return (
     <aside className="explorer-pane">
+      <div className="explorer-resizer" role="separator" aria-label="Resize explorer" aria-orientation="vertical" onPointerDown={beginResize} />
       <div className="pane-title-row">
         <span>WORKSPACE</span>
         <span className="pane-actions">
@@ -49,6 +61,14 @@ export function Explorer({ workspace }: Props) {
             onClick={workspace.addSheet}
           >
             <Plus size={14} />
+          </button>
+          <button
+            className="icon-button subtle"
+            type="button"
+            aria-label="New document"
+            onClick={() => workspace.addDocument()}
+          >
+            <FileText size={14} />
           </button>
           <button className="icon-button subtle" type="button" aria-label="More workspace actions">
             <MoreHorizontal size={15} />
@@ -65,7 +85,7 @@ export function Explorer({ workspace }: Props) {
             key={sheet.id}
             icon={<Sheet size={15} />}
             name={sheet.name}
-            active={workspace.activeSheet.id === sheet.id && workspace.activeResource !== "report"}
+            active={workspace.activeSheet.id === sheet.id && !workspace.documents.some((document) => document.id === workspace.activeResource)}
             onClick={() => workspace.activateSheet(sheet.id)}
           />
         ))}
@@ -73,14 +93,15 @@ export function Explorer({ workspace }: Props) {
 
       <div className="tree-section">
         <button className="tree-heading" type="button">
-          <ChevronDown size={14} /> Documents <span>1</span>
+          <ChevronDown size={14} /> Documents <span>{workspace.documents.length}</span>
         </button>
-        <ResourceRow
+        {workspace.documents.map((document) => <ResourceRow
+          key={document.id}
           icon={<FileText size={15} />}
-          name="report"
-          active={workspace.activeResource === "report"}
-          onClick={() => workspace.setActiveResource("report")}
-        />
+          name={document.name}
+          active={workspace.activeResource === document.id}
+          onClick={() => workspace.openResource(document.id)}
+        />)}
       </div>
 
       <div className="tree-section">

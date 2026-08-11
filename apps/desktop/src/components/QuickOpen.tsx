@@ -1,0 +1,66 @@
+import { FileText, Search, Sheet } from "lucide-react";
+import { useMemo, useState } from "react";
+import type { OfficeWorkspace } from "../state/useOfficeWorkspace";
+
+interface Props {
+  workspace: OfficeWorkspace;
+  onClose: () => void;
+}
+
+export function QuickOpen({ workspace, onClose }: Props) {
+  const [query, setQuery] = useState("");
+  const resources = useMemo(() => {
+    const sheets = workspace.workbook.sheets.map((sheet) => ({
+      id: sheet.id,
+      label: sheet.name,
+      detail: "Spreadsheet",
+      icon: <Sheet size={15} />,
+      open: () => workspace.activateSheet(sheet.id),
+    }));
+    const documents = workspace.documents.map((document) => ({
+      id: document.id,
+      label: document.name,
+      detail: "Document · Djot",
+      icon: <FileText size={15} />,
+      open: () => workspace.openResource(document.id),
+    }));
+    return [...sheets, ...documents];
+  }, [workspace]);
+  const normalized = query.trim().toLowerCase();
+  const filtered = resources.filter((resource) => !normalized || resource.label.toLowerCase().includes(normalized));
+  const open = (resource: (typeof resources)[number]) => {
+    resource.open();
+    onClose();
+  };
+
+  return (
+    <div className="palette-backdrop" role="presentation" onMouseDown={onClose}>
+      <section className="command-palette" role="dialog" aria-label="Quick open" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="palette-input-row">
+          <Search size={17} />
+          <input
+            autoFocus
+            aria-label="Quick open resource"
+            placeholder="Open a spreadsheet or document…"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") onClose();
+              if (event.key === "Enter" && filtered[0]) open(filtered[0]);
+            }}
+          />
+          <kbd>Esc</kbd>
+        </div>
+        <div className="palette-group-label"><Search size={12} /> QUICK OPEN</div>
+        <div className="palette-results">
+          {filtered.map((resource, index) => (
+            <button key={resource.id} type="button" data-selected={index === 0} onClick={() => open(resource)}>
+              {resource.icon}<span>{resource.label}</span><small>{resource.detail}</small>
+            </button>
+          ))}
+          {filtered.length === 0 ? <p className="global-search-hint">No matching resource.</p> : null}
+        </div>
+      </section>
+    </div>
+  );
+}
