@@ -13,9 +13,10 @@ interface Props {
   codexRuntime: CodexRuntime;
   xlsx: XlsxTransfer;
   docx: ReturnType<typeof useDocxTransfer>;
+  onCloseResource: (resource: string) => void;
 }
 
-export function MainEditor({ workspace, codexRuntime, xlsx, docx }: Props) {
+export function MainEditor({ workspace, codexRuntime, xlsx, docx, onCloseResource }: Props) {
   const isSpreadsheet = workspace.activeResource === "sales";
 
   return (
@@ -29,7 +30,7 @@ export function MainEditor({ workspace, codexRuntime, xlsx, docx }: Props) {
           onClick={() => workspace.openResource("sales")}
         >
           <Sheet size={14} /> sales.kdl
-        </button><button className="editor-tab-close" type="button" aria-label="Close sales.kdl tab" onClick={() => workspace.closeResource("sales")}><X size={13} /></button></div> : null}
+        </button><button className="editor-tab-close" type="button" aria-label="Close sales.kdl tab" onClick={() => onCloseResource("sales")}><X size={13} /></button></div> : null}
         {workspace.documents.filter((document) => workspace.openResources.includes(document.id)).map((document) => <div className="editor-tab-wrap" key={document.id}><button
           className="editor-tab"
           data-active={workspace.activeResource === document.id}
@@ -38,7 +39,7 @@ export function MainEditor({ workspace, codexRuntime, xlsx, docx }: Props) {
           onClick={() => workspace.openResource(document.id)}
         >
           <FileText size={14} /> {document.name}.dj
-        </button><button className="editor-tab-close" type="button" aria-label={`Close ${document.name}.dj tab`} onClick={() => workspace.closeResource(document.id)}><X size={13} /></button></div>)}
+        </button><button className="editor-tab-close" type="button" aria-label={`Close ${document.name}.dj tab`} onClick={() => onCloseResource(document.id)}><X size={13} /></button></div>)}
         <button className="new-tab-button" type="button" aria-label="Open spreadsheet tab" onClick={() => workspace.openResource("sales")}>
           <Plus size={15} />
         </button>

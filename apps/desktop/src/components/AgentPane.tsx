@@ -288,6 +288,13 @@ export function AgentPane({ workspace, sheetctl, docctl, codexRuntime, onClose, 
     // Codex has a native app-server chat surface. The other providers are
     // intentionally exposed through the full-width persistent terminal so
     // users can run the locally installed CLI rather than a fake chat.
+    if (agent !== "Codex" && (sheetctl.pending || docctl.pending || codexRuntime.pendingRequests.length > 0)) {
+      const shouldDiscard = window.confirm("保留中の承認・提案を破棄して切り替えますか？");
+      if (!shouldDiscard) return;
+      if (sheetctl.pending) void sheetctl.respond(sheetctl.pending.id, false, "Dismissed while switching agent");
+      if (docctl.pending) void docctl.respond(docctl.pending.id, false, "Dismissed while switching agent");
+      for (const request of codexRuntime.pendingRequests) void codexRuntime.answerRequest(request.id, "decline");
+    }
     if (agent !== "Codex") {
       workspace.setActiveView("terminal");
       onClose();

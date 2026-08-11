@@ -294,6 +294,10 @@ textarea:focus-visible {
 .toolbar-button:disabled { opacity: 0.32; cursor: not-allowed; }
 .toolbar-button:disabled:hover { color: #aeb9c7; background: transparent; }
 .toolbar-select:disabled { opacity: .52; cursor: not-allowed; }
+.menu-button:disabled { opacity: .55; cursor: not-allowed; }
+.autosave-status { margin-left: 6px; font-size: 10px; font-weight: 600; }
+.autosave-status-saving { color: #f4c36a; }
+.autosave-status-error { color: #ff9b9b; }
 .toolbar-button[aria-pressed="true"] { background: var(--accent-soft); color: #dcecff; }
 .toolbar-button:disabled { opacity: .35; cursor: default; }
 .toolbar-select { display: flex; align-items: center; justify-content: space-between; width: 94px; padding: 0 8px; }

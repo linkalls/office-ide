@@ -35,10 +35,13 @@ export function TitleBar({ workspace, nativeWorkspace, appTheme }: Props) {
         <span className="workbook-separator">・</span>
         <span className="workbook-saved">保存済み</span>
         <ChevronDown className="workbook-caret" size={14} />
+        <span className={`autosave-status autosave-status-${workspace.autosaveState}`} role="status" aria-live="polite">
+          {workspace.autosaveState === "saving" ? "Saving…" : workspace.autosaveState === "error" ? "Save error" : "Saved"}
+        </span>
       </div>
       <nav className="menu-bar" aria-label="Application menu">
         {MENUS.map((menu) => (
-          <button key={menu} className="menu-button" type="button">
+          <button key={menu} className="menu-button" type="button" disabled title="Menu commands are not available yet">
             {menu}
           </button>
         ))}

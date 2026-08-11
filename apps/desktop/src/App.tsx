@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { AgentPane } from "./components/AgentPane";
@@ -38,9 +38,16 @@ export function App() {
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const [quickOpenOpen, setQuickOpenOpen] = useState(false);
   const [externalCompareOpen, setExternalCompareOpen] = useState(false);
-  const recoveryDialogRef = useDialogFocus<HTMLDivElement>(Boolean(nativeWorkspace.recovery), () => undefined, "button");
+  const recoveryDialogRef = useDialogFocus<HTMLDivElement>(Boolean(nativeWorkspace.recovery), () => void nativeWorkspace.discardRecovery(), "button");
   const externalChangeDialogRef = useDialogFocus<HTMLDivElement>(Boolean(nativeWorkspace.externalChange) && !externalCompareOpen, nativeWorkspace.keepLocalChanges, "button");
   const externalCompareDialogRef = useDialogFocus<HTMLElement>(externalCompareOpen, () => setExternalCompareOpen(false), "button");
+  const closeResource = useCallback((resource: string) => {
+    const dirty = resource === "sales"
+      ? workspace.autosaveState !== "saved"
+      : workspace.canUndoDocument;
+    if (dirty && !window.confirm("未保存の変更があります。タブを閉じますか？")) return;
+    workspace.closeResource(resource);
+  }, [workspace.autosaveState, workspace.canUndoDocument, workspace.closeResource]);
 
   useEffect(() => { window.localStorage.setItem("office-ide.agent-width", String(agentWidth)); }, [agentWidth]);
   useEffect(() => { window.localStorage.setItem("office-ide.explorer-width", String(explorerWidth)); }, [explorerWidth]);
@@ -72,7 +79,7 @@ export function App() {
       }
       if (key === "w" && !event.shiftKey && workspace.activeResource !== "none") {
         event.preventDefault();
-        workspace.closeResource(workspace.activeResource);
+        closeResource(workspace.activeResource);
       }
       if (key === "f" && event.shiftKey) {
         event.preventDefault();
@@ -85,7 +92,7 @@ export function App() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [nativeWorkspace.save, workspace.activeResource, workspace.agentOpen, workspace.closeResource, workspace.setAgentOpen, workspace.setActiveView, workspace.setPaletteOpen]);
+  }, [closeResource, nativeWorkspace.save, workspace.activeResource, workspace.agentOpen, workspace.setAgentOpen, workspace.setActiveView, workspace.setPaletteOpen]);
 
   useEffect(() => {
     if (!externalCompareOpen) return undefined;
@@ -133,7 +140,7 @@ export function App() {
         data-explorer-open={workspace.explorerOpen}
       >
         {workspace.explorerOpen ? <Explorer workspace={workspace} onResize={setExplorerWidth} /> : null}
-        <MainEditor workspace={workspace} codexRuntime={codexRuntime} xlsx={xlsx} docx={docx} />
+        <MainEditor workspace={workspace} codexRuntime={codexRuntime} xlsx={xlsx} docx={docx} onCloseResource={closeResource} />
         {workspace.agentOpen ? <button className="agent-scrim" type="button" aria-label="Close agent pane" onClick={() => workspace.setAgentOpen(false)} /> : null}
         {workspace.agentOpen ? <AgentPane workspace={workspace} sheetctl={sheetctl} docctl={docctl} codexRuntime={codexRuntime} onClose={() => workspace.setAgentOpen(false)} onResize={setAgentWidth} /> : null}
       </div>
