@@ -128,19 +128,20 @@ bun run qa:complete
 直近の検証結果:
 
 - TypeScript typecheck: pass
-- Bun tests: 47 passed / 0 failed
+- Bun tests: 75 passed / 0 failed
 - Vite production build: pass
 - Browser QA: 文字単位のAgent prompt入力、地域別集計proposal review、31 operations適用、Agent History、Undo/Redo、Agent cardのReverted/Re-applied同期、reload recoveryがpass。売上50万円以上の4行を検出し24 operations適用/Undoもpass。1600×900と980×760でbody overflowなし、console warning/errorなし
 - README media QA: 約22秒/15fps/1920×1080。1600×900 sourceからLanczos変換し、大型カーソルの各target到達、Undo後History REVERTED/Agent card Reverted、Redo後History APPLIED/Agent card Re-appliedを検証し、MP4全体をffmpegで再デコードする
 - Rust/Tauri compile: GitHub ActionsのUbuntu 24.04でworkspace check/test/clippyがpass。追加runtime sliceも同じCIで継続検証する
 - Codex CLI smoke: `codex-cli 0.147.0`、ChatGPT login、read-only ephemeral turnでpass
+- Accessibility QA: dialog focus trap、Escape restoration、Agent composerへのCtrl/Cmd+J入力ガードをbrowser previewでpass。Tauri MCPはrelease windowのvisible状態まで確認済みだが、Windows foreground focusの制約により実キー承認E2Eは未完了。
 
 ## 6. 次に実装する順序
 
 次のvertical sliceは、既存proposal境界へ本物のCodex runtimeを接続する。UIを増やす前にprocess/protocol/error stateを通す。
 
-1. Rust/Codex CLIがあるdesktopで新しいhostをcompileし、signed-in initialize → thread/start → turn/start → turn/completedをsmokeする。
-2. `bun run codex:schema`のversion-matched schemaをprotocol packageへ取り込み、tolerant envelope型をgenerated wire typeへ段階的に置換する。
+1. Tauri windowでのserver-initiated approval、reconnect/cancel、turn中のprocess exit recoveryを実キー操作でintegration testする。
+2. `bun run codex:schema`のversion-matched schemaとruntime reducerのintegration coverageを拡張する。
 3. process exit後の再起動、thread resume、複数turn、timeout、invalid JSON、approval resolvedをintegration testする。
 4. `sheetctl` local IPCを実装し、mutating commandを既存Office Proposalで停止させる。
 5. Apply/Undo/RedoとAgent card/Historyのcorrelationを実Codex turnからintegration testする。

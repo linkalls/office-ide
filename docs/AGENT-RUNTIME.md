@@ -1,13 +1,13 @@
 # Agent runtime and approval boundaries
 
-## Implementation status (2026-08-09)
+## Implementation status (2026-08-11)
 
 The first Tauri connection slice is implemented in `apps/desktop/src-tauri/src/codex_host.rs`, `apps/desktop/src/state/codexRuntime.ts`, and `apps/desktop/src/state/useCodexRuntime.ts`.
 
 - Implemented: single Rust-owned child process, JSONL stdio, request routing, 20-second timeout, initialize → initialized ordering, account/read authentication gate, thread start/resume, turn start/interrupt, host status/reattach, explicit reconnect/disconnect, stderr/protocol diagnostics, shutdown, normalized frontend event reducer, streamed Agent message merging, turn/error states, and four-way command/file approval decisions.
 - Preserved: browser preview is explicitly the local planner; desktop connection failures never silently masquerade as Codex success; Office semantic Apply remains separate from Codex runtime approval.
 - Verified with `codex-cli 0.147.0` and an existing ChatGPT login: version-matched schema generation, `initialize → initialized → account/read → cwd-scoped thread/list → ephemeral thread/start → turn/start → streamed marker → turn/completed`. The smoke uses read-only sandboxing, no approvals, and does not retain the thread.
-- Verification still required in the actual Tauri window: real server-initiated approval round-trip, visual reconnect/cancel interaction, and process-exit recovery while a turn is active.
+- Browser QA now covers dialog focus trapping, Escape restoration, and the Agent composer shortcut guard. Tauri MCP confirms the release window is visible; Windows foreground focus currently prevents reliable synthetic key delivery, so server-initiated approval round-trip and active-turn process-exit recovery remain explicit follow-up checks.
 
 `bun run codex:schema` generates the installed CLI's complete bindings into an ignored directory, verifies the shared command/file approval literals, and updates the compact checked-in `@office-ide/codex-protocol` adapter. `bun run codex:smoke --turn` runs the redacted real-CLI lifecycle check. For development only, `CODEX_APP_SERVER_BIN` may override the executable and `CODEX_APP_SERVER_PREFIX_ARGS` may provide a JSON array of launcher arguments; production continues to invoke `codex app-server` directly.
 
