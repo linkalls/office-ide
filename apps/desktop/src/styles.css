@@ -683,6 +683,7 @@ textarea:focus-visible {
 }
 .explorer-resizer { position: absolute; z-index: 8; top: 0; right: -4px; bottom: 0; width: 8px; cursor: col-resize; touch-action: none; }
 .explorer-resizer:hover, .explorer-resizer:active { background: rgb(88 166 255 / .38); }
+.agent-scrim { display: none; }
 
 @media (max-width: 1180px) {
   :root { --explorer-width: 210px; --agent-width: 340px; }
