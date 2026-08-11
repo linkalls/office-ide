@@ -1,0 +1,4 @@
+interface:
+  display_name: "Office IDE Agent"
+  short_description: "Operate Office IDE workbooks through reviewed semantic changes."
+  default_prompt: "Use the Office IDE workbook context and sheetctl to inspect or propose spreadsheet changes."
